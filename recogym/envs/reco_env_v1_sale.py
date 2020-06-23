@@ -82,11 +82,38 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.user_ps_list=[] ##H
 
 
-    def generate_organic_sessions(self):
+    def generate_organic_sessions(self, initial_product = None):
         
         # Initialize session.
         session = OrganicSessions()
         sales = 0 ##H
+        
+        if initial_product is not None :
+            self.product_view = initial_product
+            
+            # If a product is specified, use it as initial page for the organic session
+            session.next(
+                DefaultContext(self.current_time, self.current_user_id),
+                self.product_view
+            )
+            
+            # Draw a sale and update total number of sales
+            sale = self.draw_sale(self.product_view) ##H
+            sales += sale ##H
+            
+            ##H
+            if sale : 
+                # self.state is not updated to stay in the organic state 
+                # it is only updated in the sessions object
+                self.current_time +=1 
+                session.next(
+                    DefaultContext(self.current_time, self.current_user_id),
+                    self.product_view,
+                    sale
+                    )
+
+            # Update markov state.
+            self.update_state()
         
         while self.state == organic:
             # Add next product view.
@@ -179,7 +206,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         # Markov state dependent logic.
         if self.state == organic:
-            sessions, reward = self.generate_organic_sessions() ##H
+            sessions, reward = self.generate_organic_sessions(initial_product) ##H
         else:
             sessions = self.empty_sessions
             reward = 0
