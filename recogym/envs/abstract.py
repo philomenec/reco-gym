@@ -189,6 +189,9 @@ class AbstractEnv(gym.Env, ABC):
 
         if reward == 1:
             self.state = organic  # After a click, Organic Events always follow.
+            initial_product = action_id
+        else :
+            initial_product = None
 
         # Markov state dependent logic.
         if self.state == organic:
