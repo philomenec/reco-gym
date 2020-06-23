@@ -203,6 +203,10 @@ class RecoEnv1Sale(AbstractEnv): ##H
         if click == 1:
             self.state = organic  # After a click, Organic Events always follow.
             self.update_user_feature(action_id) ##H # Update user feature based on reco
+            initial_product = action_id
+            
+        else :
+            initial_product = None
 
         # Markov state dependent logic.
         if self.state == organic:
