@@ -60,11 +60,11 @@ def check_sales(agent, env, num_products=10):
         env.reset()
         done = False
 
-        observation, reward, done = None, 0, False
+        observation, reward, done, info = None, 0, False, {'click': 0}
         while not done:
             old_observation = observation
-            action, observation, reward, done, info = env.step_offline(observation, reward, done)
-            agent.train(old_observation, action, reward, done)
+            action, observation, reward, done, info = env.step_offline(observation, reward, done, info)
+            agent.train(old_observation, action, reward, done, info)
 
     # Train on 100 users online and track click through rate.
     num_online_users = 100
@@ -569,3 +569,5 @@ def share_sale_over_click_session(data):
 def share_clicks_with_sale(data):
     return len(data[(data["c"]==1) & (data["r"]>0)])/sum(data["c"]==1)  
     
+
+

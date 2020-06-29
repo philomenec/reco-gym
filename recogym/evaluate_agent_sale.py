@@ -47,13 +47,13 @@ def evaluate_agent_sale(
     for u in range(num_initial_train_users):
         env.reset(unique_user_id + u)
         agent.reset()
-        new_observation, reward, done, _ = env.step(None)
+        new_observation, reward, done, info = env.step(None)
         while True:
             old_observation = new_observation
-            action, new_observation, reward, done, _ = env.step_offline(
-                new_observation, reward, False
+            action, new_observation, reward, done, info = env.step_offline(
+                new_observation, reward, False, info
             )
-            agent.train(old_observation, action, reward, done)
+            agent.train(old_observation, action, reward, done, info)
             if done:
                 break
     unique_user_id += num_initial_train_users
@@ -722,7 +722,7 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
         
          # total number of sales
         stat_tot_sales['Agent'].append(agent_id)
-        stat_tot_sales['TotSales'] = successes/number_of_users
+        stat_tot_sales['TotSales'] = np.sum(bandits['r'])/number_of_users
         
         # share of users who bought something
         stat_share_user_sale['Agent'].append(agent_id)

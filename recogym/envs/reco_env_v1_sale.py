@@ -231,7 +231,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         )
     
 
-    def step_offline(self, observation, reward, done):
+    def step_offline(self, observation, reward, done, info):
         """Call step function wih the policy implemented by a particular Agent."""
 
         if self.first_step:
@@ -240,7 +240,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             assert (hasattr(self, 'agent'))
             assert (observation is not None)
             if self.agent:
-                action = self.agent.act(observation, reward, done)
+                action = self.agent.act(observation, reward, done, info)
             else:
                 # Select a Product randomly.
                 action = {
@@ -339,18 +339,18 @@ class RecoEnv1Sale(AbstractEnv): ##H
         for _ in trange(num_offline_users, desc='Users'):
             self.reset(unique_user_id)
             unique_user_id += 1
-            observation, reward, done, _ = self.step(None)
+            observation, reward, done, info = self.step(None)
 
             while not done:
                 _store_organic(observation)
                 action, observation, reward, done, info = self.step_offline(
-                    observation, reward, done
+                    observation, reward, done, info
                 )
                 _store_bandit(action, reward, info)
 
             _store_organic(observation)
             action, _, reward, done, info = self.step_offline(
-                observation, reward, done
+                observation, reward, done, info
             )
             assert done, 'Done must not be changed!'
             _store_bandit(action, reward, info)
