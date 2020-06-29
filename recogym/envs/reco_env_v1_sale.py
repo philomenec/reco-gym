@@ -49,10 +49,10 @@ env_1_args = {
 env_1_sale_args = {
     **env_1_args,
     **{
-        'kappa': 0.5, # post-click scaling of theuser embedding update 
+        'kappa': 0.2, # post-click scaling of theuser embedding update 
         'sigma_Lambda' : 1,
         # 'user_propensity' : {'a':2, 'b':6}, # propensity of buying of users, drawn from a beta distribution
-        'psale_scale' : 0.25, # scaling coefficient for the probability of drawing a sale
+        'psale_scale' : 0.15, # scaling coefficient for the probability of drawing a sale
         'delta_for_clicks' : 1,
         'delta_for_views' : 0
     }
@@ -80,7 +80,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.proba_sales={} ##H
         self.proba_sales_after_scaling={} ##H
         self.user_ps_list=[] ##H
-
+        self.user_embedding_list = []
+        self.action_list = []
 
     def generate_organic_sessions(self, initial_product = None):
         
@@ -178,6 +179,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             assert (action_id is None)
             self.first_step = False
             sessions, sales = self.generate_organic_sessions() ##H
+            self.user_embedding_list.append({"init":self.omega})
             return (
                 Observation(
                     DefaultContext(
@@ -215,6 +217,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
             sessions = self.empty_sessions
             reward = 0
 
+        if self.state == stop : 
+            self.user_embedding_list[len(self.user_embedding_list)-1]["end"] = self.delta
 
         return (
             Observation(
@@ -237,7 +241,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
             assert (observation is not None)
             if self.agent:
                 action = self.agent.act(observation, reward, done)
-                print("step offline action", action)
             else:
                 # Select a Product randomly.
                 action = {
@@ -253,6 +256,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
                 }
 
         if done:
+            self.user_embedding_list[len(self.user_embedding_list)-1]["end"] = self.delta
             return (
                 action,
                 Observation(

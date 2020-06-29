@@ -93,10 +93,10 @@ def check_sales(agent, env, num_products=10):
         list_proba_sales_after_scaling.append(deepcopy(env).proba_sales_after_scaling)
 
     share_sales = num_sales / num_events
+    print("Total number of sales:",num_sales)
+    print(f"Share of sales (Nb sales/Nb recos): {share_sales:.4f}")
 
-    print(f"Share of sales: {share_sales:.4f}")
-
-    return share_sales, list_sales, list_proba_sales, list_proba_sales_after_scaling
+    return num_sales, share_sales, list_sales, list_proba_sales, list_proba_sales_after_scaling
 
 
 
@@ -513,5 +513,59 @@ class PoemContextualBandit(VanillaContextualBandit):
     
     
     
+def share_user_with_sale(data):
+    '''Input : data (the logs)
+    Output : share of users with at least one sale over the entire episode'''
+    grouped_data = data[["r","u"]].groupby("u").sum()["r"]
+    share = sum(grouped_data>0)/len(data["u"].unique())
+    return share
+
+def log_count_organic_session(data):
+    '''
+    Input : data (the logs, pandas dataframe)
+    Output : the same dataframe, where each session has been numbered (for each user)
+    '''
+    data_ = data.copy()
+    list_organic_sessions = []
+    for user in data["u"].unique():
+        data_user = data_[data_["u"]==user]
+        count_organic_session = 1
+        prev_row = "organic"
+        for row in range(len(data_user)):
+            next_row = data_user["z"].iloc[row]
+            if (prev_row == 'bandit') & ((next_row == 'sale') | (next_row == 'organic')):
+                count_organic_session += 1
+            prev_row = next_row
+            list_organic_sessions.append(count_organic_session)
+    data_["organic_session"] = list_organic_sessions
+    return data_
+
+def share_sale_over_click_session(data):
+    '''
+    Input : data (the logs)
+    Output : (Number of organic sessions with at least one sale / Number of clicks ,
+                Number of organic sessions with at least one sale / Number of organic sessions)
+    '''
+    # Create dataframe that counts the number of organic sessions for each user
+    data_ = log_count_organic_session(data)
+    # add a boolean for whether there is sale or not
+    data_["sale_bool"] = (data_["z"]=='sale')*1
+    # Count number of sales  per organic session and user
+    sales_per_organic_session = data_[["u","organic_session","sale_bool"]].groupby(["u","organic_session"]).sum()
+    # Count number of sales event (dummie) per organic session and user
+    sales_per_organic_session["sale_bool"] = (sales_per_organic_session["sale_bool"]>0)*1
+    sales_per_organic_session['organic_session'] = [sales_per_organic_session.index[i][1] for i in range(len(sales_per_organic_session))]
+    # Don't count sales that may have happened during the first organic session (before a click)
+    sales_per_organic_session["sale_bool"] = sales_per_organic_session["sale_bool"]*(sales_per_organic_session["organic_session"]!= 1)
+    # Total number of organic sessions (all users)
+    nb_organic_sessions = len(sales_per_organic_session)
+    # Share of organic sessions that include at least one sale event (all users)
+    share_session_with_sale = sum(sales_per_organic_session["sale_bool"])/nb_organic_sessions
+    # Number of organic sessions that include at least one sale event over number of clicks (all users)
+    share_clicks_with_sale = sum(sales_per_organic_session["sale_bool"])/sum(data["c"]==1)
     
+    return share_clicks_with_sale, share_session_with_sale
+
+def share_clicks_with_sale(data):
+    return len(data[(data["c"]==1) & (data["r"]>0)])/sum(data["c"]==1)  
     
