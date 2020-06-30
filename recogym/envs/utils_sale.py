@@ -109,7 +109,7 @@ class SingleActionAgent(Agent):
         Agent.__init__(self, config)
         self.preferred_action = preferred_action
         
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         probabilities = np.zeros(self.config.num_products)
         probabilities[self.preferred_action] = 1.
         return {
@@ -140,7 +140,7 @@ class PopularityAgent(Agent):
             for session in observation.sessions():
                 self.organic_views[session['v']] += 1
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Act method returns an action based on current observation and past
             history"""
 
@@ -287,7 +287,7 @@ class LikelihoodAgent(Agent):
         ])
         return self.model.predict_proba(all_action_features)[:, 1]
         
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Act method returns an action based on current observation and past history"""
         self.feature_provider.observe(observation)        
         user_state = self.feature_provider.features(observation)
@@ -447,7 +447,7 @@ class VanillaContextualBandit(Agent):
         for session in observation.sessions():
             self.user_state[int(session['v'])] += 1
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         ''' Pick an action, based on the current observation and the history '''
         # Observe
         self.observe(observation)
@@ -569,5 +569,36 @@ def share_sale_over_click_session(data):
 def share_clicks_with_sale(data):
     return len(data[(data["c"]==1) & (data["r"]>0)])/sum(data["c"]==1)  
     
+from numba import njit
+@njit(nogil=True)
+def sig(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+def expected_sale_given_action_click(env, action, user_update = True):
+    proba_nomore_organic = env.config.prob_organic_to_bandit + env.config.prob_leave_organic
+    
+    if ("delta_for_views" in dir(env.config) is not None) & (env.config.delta_for_views == True) :
+        user_feature_view = env.delta
+    else :
+        user_feature_view = env.omega
+    
+    # Proba of viewing each product
+    log_proba_view = np.array([user_feature_view[:,0]@env.Gamma[int(a),:] + env.mu_organic[int(a)] for a in range(env.config.num_products)])
+    proba_view = np.exp(log_proba_view - max(log_proba_view))
+    proba_view = proba_view / proba_view.sum()
+    proba_view = proba_view[:,0]
+    
+    # Difference in sale mean for each product if the product is recommended
+    if user_update == True : 
+        proba_with_clicked_action = np.array([sig(((1-env.config.kappa)*env.delta[:,0] + env.config.kappa*env.Lambda[int(action),:])@env.Lambda[int(a),:]) for a in range(env.config.num_products)])
+    else :
+        proba_with_clicked_action = np.array([sig((env.delta[:,0])@env.Lambda[int(a),:]) for a in range(env.config.num_products)])    
+    
+    E = proba_with_clicked_action[int(action)] + ((1/proba_nomore_organic)-1)*np.sum(proba_view*proba_with_clicked_action)
+    
+    return E
+
+
+
 
 

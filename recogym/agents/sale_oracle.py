@@ -22,7 +22,7 @@ class SaleOracleAgent(Agent, RecoEnv1Sale):
         super(SaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Make a recommendation"""
         self.delta = self.env.delta
         # Difference in dot product post- and before- click for each product
@@ -68,7 +68,7 @@ class ViewSaleOracleAgent(Agent, RecoEnv1Sale):
         super(ViewSaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -127,6 +127,76 @@ class ViewSaleOracleAgent(Agent, RecoEnv1Sale):
 
 
 
+class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
+    """
+    Sale Oracle
+
+    Has access to user and product features and popularity
+    """
+
+    def __init__(self, env):
+        super(ClickSaleOracleAgent, self).__init__(env)
+        self.env = env
+
+    def act(self, observation, reward, done, info):
+        """Make a recommendation"""
+        self.omega = self.env.omega
+        self.delta = self.env.delta
+        
+        if ("delta_for_clicks" in dir(self.env.config)) & (self.env.config.delta_for_clicks == 1):
+            self.user_feature_click = self.delta
+        else :
+            self.user_feature_click = self.omega
+        
+
+        # Proba of clicking for each product
+        proba_click = np.array([ff(self.user_feature_click[:,0]@self.beta[int(a),:] + self.mu_bandit[int(a)]) for a in range(self.env.config.num_products)])
+        proba_click = proba_click[:,0]
+        
+        # Difference in sale mean for each product if the product is recommended
+        proba_with_click = np.array([sig(((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:])@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
+        proba_no_click = np.array([sig(self.delta[:,0]@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
+        proba_difference = proba_with_click - proba_no_click
+        
+        # Take argmax
+        action = np.argmax(proba_click * proba_difference)
+        self.list_actions.append(action)
+        
+        if self.env.config.with_ps_all:
+            ps_all = np.zeros(self.config.num_products)
+            ps_all[action] = 1.0
+        else:
+            ps_all = ()
+
+        return {
+            **super().act(observation, reward, done),
+            **{
+                'a': action,
+                'ps': self.env.config.psale_scale*sig(self.Lambda[int(action),:] @ (self.delta))[0],
+                'ps-a': ps_all,
+            },
+        }
+
+    def history(self):
+        return self.list_actions
+
+    def reset(self):
+        self.list_actions = []
+        self.kappa = self.env.config.kappa
+        self.omega = self.env.omega
+        self.delta = self.env.delta
+        
+        if ("delta_for_clicks" in dir(self.env.config)) & (self.env.config.delta_for_clicks ==1) :
+            self.user_feature_click = self.delta
+        else :
+            self.user_feature_click = self.omega
+        self.beta = self.env.beta
+        self.Lambda = self.env.Lambda
+        self.mu_organic = self.env.mu_organic
+        self.mu_bandit = self.env.mu_bandit
+        self.list_actions = []
+
+
 
 
 class ClickViewSaleOracleAgent(Agent, RecoEnv1Sale):
@@ -140,7 +210,7 @@ class ClickViewSaleOracleAgent(Agent, RecoEnv1Sale):
         super(ClickViewSaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -214,10 +284,11 @@ class ClickViewSaleOracleAgent(Agent, RecoEnv1Sale):
         self.mu_organic = self.env.mu_organic
         self.mu_bandit = self.env.mu_bandit
         self.list_actions = []
+        
 
-
-
-class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
+from ..envs.utils_sale import expected_sale_given_action_click
+        
+class ClickViewExpectSalesOracleAgent(Agent, RecoEnv1Sale):
     """
     Sale Oracle
 
@@ -225,10 +296,11 @@ class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
     """
 
     def __init__(self, env):
-        super(ClickSaleOracleAgent, self).__init__(env)
+        super(ClickViewExpectSalesOracleAgent, self).__init__(env)
         self.env = env
+        self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -243,13 +315,12 @@ class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
         proba_click = np.array([ff(self.user_feature_click[:,0]@self.beta[int(a),:] + self.mu_bandit[int(a)]) for a in range(self.env.config.num_products)])
         proba_click = proba_click[:,0]
         
-        # Difference in sale mean for each product if the product is recommended
-        proba_with_click = np.array([sig(((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:])@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
-        proba_no_click = np.array([sig(self.delta[:,0]@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
-        proba_difference = proba_with_click - proba_no_click
+        # Difference in expectation whether the embedding gets updated or not
+        expectation_difference = [expected_sale_given_action_click(self.env, a, user_update = True) 
+                                  - expected_sale_given_action_click(self.env, a, user_update = False) for a in range(self.env.config.num_products)]
         
         # Take argmax
-        action = np.argmax(proba_click * proba_difference)
+        action = np.argmax(proba_click *  expectation_difference)
         self.list_actions.append(action)
         
         if self.env.config.with_ps_all:
@@ -272,16 +343,101 @@ class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
 
     def reset(self):
         self.list_actions = []
-        self.kappa = self.env.config.kappa
         self.omega = self.env.omega
         self.delta = self.env.delta
+        
+        if ("delta_for_views" in dir(self.env.config) is not None) & (self.env.config.delta_for_views == True) :
+            self.user_feature_view = self.delta
+        else :
+            self.user_feature_view = self.omega
         
         if ("delta_for_clicks" in dir(self.env.config)) & (self.env.config.delta_for_clicks ==1) :
             self.user_feature_click = self.delta
         else :
             self.user_feature_click = self.omega
-        self.beta = self.env.beta
         self.Lambda = self.env.Lambda
-        self.mu_organic = self.env.mu_organic
+        self.beta = self.env.beta
+        self.mu_bandit = self.env.mu_bandit
+        self.list_actions = []
+
+        
+        
+        
+        
+class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
+    """
+    Sale Oracle
+
+    Has access to user and product features and popularity
+    """
+
+    def __init__(self, env):
+        super(ClickViewExpectGhostSalesOracleAgent, self).__init__(env)
+        self.env = env
+        self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
+
+    def act(self, observation, reward, done, info):
+        """Make a recommendation"""
+        self.omega = self.env.omega
+        self.delta = self.env.delta
+        
+        if ("delta_for_clicks" in dir(self.env.config)) & (self.env.config.delta_for_clicks == 1):
+            self.user_feature_click = self.delta
+        else :
+            self.user_feature_click = self.omega
+        
+
+        # Proba of clicking for each product
+        proba_click = np.array([ff(self.user_feature_click[:,0]@self.beta[int(a),:] + self.mu_bandit[int(a)]) for a in range(self.env.config.num_products)])
+        proba_click = proba_click[:,0]
+        
+        # expectation of sales
+        expectation_click = np.array([expected_sale_given_action_click(self.env, a, user_update = True) for a in range(self.env.config.num_products)])
+        expectation_noclick = np.array([expected_sale_given_action_click(self.env, a, user_update = False) for a in range(self.env.config.num_products)])
+        p_bo = self.env.config.prob_bandit_to_organic
+        nb_steps_left = np.array([int(1/self.p_transition_out_of_organic)-i for i in range(1,int(1/self.p_transition_out_of_organic))])
+        p_bo_power = np.array([p_bo**i for i in range(1,int(1/self.p_transition_out_of_organic))])
+        Cp_bo_power = np.array([(1-p_bo)**i for i in range(0,int(1/self.p_transition_out_of_organic)-1)])
+        proba_to_organic_after_p_steps = nb_steps_left*p_bo_power*Cp_bo_power
+        expectation_noclick = np.sum(proba_to_organic_after_p_steps)*expectation_noclick
+        
+        # Take argmax
+        action = np.argmax((proba_click *  expectation_click)+((1-proba_click)*expectation_noclick))
+        self.list_actions.append(action)
+        
+        if self.env.config.with_ps_all:
+            ps_all = np.zeros(self.config.num_products)
+            ps_all[action] = 1.0
+        else:
+            ps_all = ()
+
+        return {
+            **super().act(observation, reward, done),
+            **{
+                'a': action,
+                'ps': self.env.config.psale_scale*sig(self.Lambda[int(action),:] @ (self.delta))[0],
+                'ps-a': ps_all,
+            },
+        }
+
+    def history(self):
+        return self.list_actions
+
+    def reset(self):
+        self.list_actions = []
+        self.omega = self.env.omega
+        self.delta = self.env.delta
+        
+        if ("delta_for_views" in dir(self.env.config) is not None) & (self.env.config.delta_for_views == True) :
+            self.user_feature_view = self.delta
+        else :
+            self.user_feature_view = self.omega
+        
+        if ("delta_for_clicks" in dir(self.env.config)) & (self.env.config.delta_for_clicks ==1) :
+            self.user_feature_click = self.delta
+        else :
+            self.user_feature_click = self.omega
+        self.Lambda = self.env.Lambda
+        self.beta = self.env.beta
         self.mu_bandit = self.env.mu_bandit
         self.list_actions = []
