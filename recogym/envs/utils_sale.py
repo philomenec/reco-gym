@@ -19,11 +19,15 @@ P = 10  # Number of Products
 U = 2000 # Number of Users
 
 def share_states(data):
+    ''' Dictionary with share of time spent in each state'''
     return {'organic' : np.sum(data["z"]=="organic")/len(data), 
             'bandit' : np.sum(data["z"]=="bandit")/len(data),
             'sale' : np.sum(data["z"]=="sale")/len(data)}
 
 def share_sale(data):
+    ''' Returns two metrics : 
+        - sale_bin : Number of sale events/Number of recos
+        - sal_tot : Total number of sales/Number of recos'''
     return {'sale_bin' : np.sum((data["z"]=='bandit') & (data["r"]>0))/np.sum(data["z"]=='bandit'), 
             'sale_tot' : np.sum(data["r"])/np.sum(data["z"]=='bandit')}
 
@@ -34,6 +38,7 @@ def env_infos(env):
            'proba_sales' : env.proba_sales, 'proba_sales_after_scaling' : env.proba_sales_after_scaling}
 
 def count_sales_first_session(data):
+    ''' Given a dataset, counts the number of times a sale happens before the first reco'''
     sales_first_session = {}
     no_event=[]
     for user in data['u'].unique() :
@@ -60,11 +65,11 @@ def check_sales(agent, env, num_products=10):
         env.reset()
         done = False
 
-        observation, reward, done, info = None, 0, False, {'click': 0}
+        observation, reward, done, info = None, 0, False, {}
         while not done:
             old_observation = observation
             action, observation, reward, done, info = env.step_offline(observation, reward, done, info)
-            agent.train(old_observation, action, reward, done, info)
+            agent.train(old_observation, action, reward, done)
 
     # Train on 100 users online and track click through rate.
     num_online_users = 100
@@ -109,7 +114,7 @@ class SingleActionAgent(Agent):
         Agent.__init__(self, config)
         self.preferred_action = preferred_action
         
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         probabilities = np.zeros(self.config.num_products)
         probabilities[self.preferred_action] = 1.
         return {
@@ -140,7 +145,7 @@ class PopularityAgent(Agent):
             for session in observation.sessions():
                 self.organic_views[session['v']] += 1
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Act method returns an action based on current observation and past
             history"""
 
@@ -287,7 +292,7 @@ class LikelihoodAgent(Agent):
         ])
         return self.model.predict_proba(all_action_features)[:, 1]
         
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Act method returns an action based on current observation and past history"""
         self.feature_provider.observe(observation)        
         user_state = self.feature_provider.features(observation)
@@ -447,7 +452,7 @@ class VanillaContextualBandit(Agent):
         for session in observation.sessions():
             self.user_state[int(session['v'])] += 1
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         ''' Pick an action, based on the current observation and the history '''
         # Observe
         self.observe(observation)
@@ -567,6 +572,7 @@ def share_sale_over_click_session(data):
     return share_clicks_with_sale, share_session_with_sale
 
 def share_clicks_with_sale(data):
+    ''' Number of clicks & sales / Number of clicks'''
     return len(data[(data["c"]==1) & (data["r"]>0)])/sum(data["c"]==1)  
     
 from numba import njit
@@ -575,6 +581,16 @@ def sig(x):
     return 1.0 / (1.0 + np.exp(-x))
 
 def expected_sale_given_action_click(env, action, user_update = True):
+    ''' Estimates the proba of sale in the next organic session, after a clicked reco for product a
+    Inputs : 
+        env : the env
+        action : the reco
+        user_update : whether to update the user embedding after the clicked reco
+    Output : 
+        the expected number of sales in the following organic session, derived as :
+            E[#sales in next organic session given a click for a] = P(buy a | A=a,c=1,view a) + 
+                                              (E[length of organic session]-1)\sum_{product}P(view product)P(buy product | view product)
+    '''
     proba_nomore_organic = env.config.prob_organic_to_bandit + env.config.prob_leave_organic
     
     if ("delta_for_views" in dir(env.config) is not None) & (env.config.delta_for_views == True) :

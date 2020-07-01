@@ -21,7 +21,7 @@ class RandomAgent(Agent):
 
     def act(self, observation, reward, done, info=None):
         return {
-            **super().act(observation, reward, done, info),
+            **super().act(observation, reward, done, info=None),
             **{
                 'a': self.rng.choice(self.config.num_products),
                 'ps': 1.0 / float(self.config.num_products),

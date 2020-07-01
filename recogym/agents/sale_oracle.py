@@ -11,18 +11,29 @@ from recogym.envs.reco_env_v1_sale import RecoEnv1Sale
 def sig(x):
     return 1.0 / (1.0 + np.exp(-x))
 
+
+######################### The following oracles can be used if there is NO direct landing 
+######################### On clicked products
+
+
+
 class SaleOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product conversion features only
+    The recommended product is  :
+        argmax_{a} P(sale | a is recommended, a is clicked, a is viewed) - P(sale | a is not recommended, a is viewed)
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
         super(SaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.delta = self.env.delta
         # Difference in dot product post- and before- click for each product
@@ -59,16 +70,21 @@ class SaleOracleAgent(Agent, RecoEnv1Sale):
 
 class ViewSaleOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    View Sale Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product Views + Conversion features 
+    The recommended product is just :
+        argmax_{a} P(a is viewed) [ P(sale | a is recommended, a is clicked, a is viewed) - P(sale | a is not recommended, a is viewed) ] 
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
         super(ViewSaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -128,17 +144,22 @@ class ViewSaleOracleAgent(Agent, RecoEnv1Sale):
 
 
 class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
-    """
-    Sale Oracle
+"""
+    Click Sale Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product Click + Conversion features 
+    The recommended product is just :
+        argmax_{a} P(a is clicked)[P(sale | a is recommended, a is clicked, a is viewed) - P(sale | a is not recommended, a is viewed)]
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
         super(ClickSaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -201,16 +222,22 @@ class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
 
 class ClickViewSaleOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Click View Sale Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and all product features (Views + Conversion + Click features)
+    The recommended product is just :
+        argmax_{a} P(a is viewed)P(a is clicked)[P(sale | a is recommended, a is clicked, a is viewed) - P(a is clicked)P(sale | a is not recommended, a is viewed)]
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
+
 
     def __init__(self, env):
         super(ClickViewSaleOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -286,13 +313,31 @@ class ClickViewSaleOracleAgent(Agent, RecoEnv1Sale):
         self.list_actions = []
         
 
+
+
+
+####################################################################################################    
+######################### The following oracles can be used if there is a direct landing 
+######################### On clicked products
+
 from ..envs.utils_sale import expected_sale_given_action_click
-        
+
 class ClickViewExpectSalesOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Click View Expect Sale Oracle 
 
-    Has access to user and product features and popularity
+    Has access to all user and product features.
+    The goal is to estimate the expected number of sale in the organic session following a reco,
+    compared to the one if there is the same reco but no user embedding update. 
+    For this, we maximize : 
+        (E[#sales in next organic session given a click for a]-E[#sales in next organic session given a click for a without user update])*P(c=1|A=a)
+    where :
+    E[#sales in next organic session given a click for a] = P(buy a | A=a,c=1,view a) + 
+                                              (E[length of organic session]-1)\sum_{product}P(view product)P(buy product | view product)
+    
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is a direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
@@ -300,7 +345,7 @@ class ClickViewExpectSalesOracleAgent(Agent, RecoEnv1Sale):
         self.env = env
         self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -365,10 +410,23 @@ class ClickViewExpectSalesOracleAgent(Agent, RecoEnv1Sale):
         
         
 class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
-    """
-    Sale Oracle
+     """
+    Click View Expect Ghost Sale Oracle 
 
-    Has access to user and product features and popularity
+    Has access to all user and product features.
+    The goal is to estimate the expected number of sale in the organic session following a reco,
+    compared to the one if only ghost ads are shown during the length of the organic session we compare it with.
+    If ghost ads are shown, the user needs to transition to the organic state by himself
+    For this, we maximize : 
+        (E[#sales in next organic session given a click for a]-E[#sales in next organic session given ghost ads])*P(c=1|A=a)
+    where :
+    E[#sales in next organic session given a click for a] = P(buy a | A=a,c=1,view a) + 
+                                              (E[length of organic session]-1)\sum_{product}P(view product)P(buy product | view product)
+    E[#sales in next organic session given ghost ads] = E[#steps in organic]E[#sales|organic state]
+    
+    The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
+    This oracle can be used if there is a direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
@@ -376,7 +434,7 @@ class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
         self.env = env
         self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -394,11 +452,14 @@ class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
         # expectation of sales
         expectation_click = np.array([expected_sale_given_action_click(self.env, a, user_update = True) for a in range(self.env.config.num_products)])
         expectation_noclick = np.array([expected_sale_given_action_click(self.env, a, user_update = False) for a in range(self.env.config.num_products)])
+        # probability of transition from bandit to organic
         p_bo = self.env.config.prob_bandit_to_organic
         nb_steps_left = np.array([int(1/self.p_transition_out_of_organic)-i for i in range(1,int(1/self.p_transition_out_of_organic))])
         p_bo_power = np.array([p_bo**i for i in range(1,int(1/self.p_transition_out_of_organic))])
         Cp_bo_power = np.array([(1-p_bo)**i for i in range(0,int(1/self.p_transition_out_of_organic)-1)])
+        # Expected number of steps in the organic state
         proba_to_organic_after_p_steps = nb_steps_left*p_bo_power*Cp_bo_power
+        # Expected number of sales given the organic state, and no click (no user embedding update)
         expectation_noclick = np.sum(proba_to_organic_after_p_steps)*expectation_noclick
         
         # Take argmax

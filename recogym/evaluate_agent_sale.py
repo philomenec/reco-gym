@@ -21,6 +21,7 @@ from recogym.agents import EpsilonGreedy, epsilon_greedy_args
 from .envs.context import DefaultContext
 from .envs.observation import Observation
 from .envs.session import OrganicSessions
+from recogym.envs.reco_env_v1_sale import ff, sig
 
 from recogym.evaluate_agent import (EpsilonDelta, EpsilonSteps, EpsilonPrecision, EvolutionEpsilons,
                                     GraphCTRMin,GraphCTRMax,
@@ -53,7 +54,7 @@ def evaluate_agent_sale(
             action, new_observation, reward, done, info = env.step_offline(
                 new_observation, reward, False, info
             )
-            agent.train(old_observation, action, reward, done, info)
+            agent.train(old_observation, action, reward, done)
             if done:
                 break
     unique_user_id += num_initial_train_users
@@ -115,22 +116,22 @@ def evaluate_agent_sale(
                     training_agent.train(old_observation, action, reward, done)
 
                 if reward:
-                    successes += reward ##H
+                    successes += reward 
                     if 'greedy' in action and action['greedy']:
-                        successes_greedy += reward ##H
+                        successes_greedy += reward 
                     rewards[EvolutionCase.ACTIONS][action['a']][-1] += reward ##H
                 else:
                     if 'greedy' in action and action['greedy']:
                         failures_greedy += 1
                     failures += 1
                     
-                if info["click"]:
+                if (observation.click is not None) and (observation.click == 1):
                     successes_click += 1
-                    if 'greedy' in action and action['greedy']:
+                    if ('greedy' in action) and action['greedy']:
                         successes_greedy_click += 1
                     rewards[EvolutionCase.ACTIONS_click][action['a']][-1] += 1
                 else:
-                    if 'greedy' in action and action['greedy']:
+                    if ('greedy' in action) and action['greedy']:
                         failures_greedy_click += 1
                     failures_click += 1
                     
@@ -1037,23 +1038,27 @@ def plot_verify_agents_sale(result_sales, result_clicks, result_tot_sales, resul
 
 
 def plot_CR_CTR(agent,result):
+    ''' Plot conversion rate as a function of the CTR based on verify_agent results, and agent name'''
+    
+    # Load env infos
     beta = result['config_list'][agent]['beta']
     psale_scale = result['config_list'][agent]['psale_scale']
     Lambda = result['config_list'][agent]['Lambda']
-    from recogym.envs.reco_env_v1_sale import ff, sig
+    
+    # Get user embeddings and list of taken actions
     embeddings = [result["User embeddings"][agent][i]["init"] for i in result["reco"][agent]["u"]]
     actions = list(result["reco"][agent]["a"])
 
-    # plt.scatter([ff(embeddings[i][:,0]@beta[actions[i],:]) for i in range(len(embeddings))],
-    #             [psale_scale*sig(embeddings[i][:,0]@Lambda[actions[i],:]) for i in range(len(embeddings))], 
-    #             alpha=0.3, label='init')
-
-
-    embeddings = [result["User embeddings"][agent][i]["end"] for i in result["reco"][agent]["u"]]
-    actions = list(result["reco"][agent]["a"])
-
+    # plot the embeddings dot product
     plt.scatter([embeddings[i][:,0]@beta[actions[i],:] for i in range(len(embeddings))],
                 [embeddings[i][:,0]@Lambda[actions[i],:] for i in range(len(embeddings))], 
+                alpha=0.3, label='init')
+
+    embeddings_end = [result["User embeddings"][agent][i]["end"] for i in result["reco"][agent]["u"]]
+    actions = list(result["reco"][agent]["a"])
+    
+    plt.scatter([embeddings_end[i][:,0]@beta[actions[i],:] for i in range(len(embeddings_end))],
+                [embeddings_end[i][:,0]@Lambda[actions[i],:] for i in range(len(embeddings_end))], 
                 alpha=0.3, label='end')
     plt.xlabel("CTR embedding")
     plt.ylabel("CR embedding")
@@ -1061,15 +1066,19 @@ def plot_CR_CTR(agent,result):
     plt.legend()
     plt.show()
 
+    # Plot the probas after embedding dot product transformation
     plt.scatter([ff(embeddings[i][:,0]@beta[actions[i],:]) for i in range(len(embeddings))],
                 [psale_scale*sig(embeddings[i][:,0]@Lambda[actions[i],:]) for i in range(len(embeddings))], 
+                alpha=0.3, label='init')
+    
+    plt.scatter([ff(embeddings_end[i][:,0]@beta[actions[i],:]) for i in range(len(embeddings_end))],
+                [psale_scale*sig(embeddings_end[i][:,0]@Lambda[actions[i],:]) for i in range(len(embeddings_end))], 
                 alpha=0.3, label='end')
     plt.xlabel("CTR")
     plt.ylabel("CR")
     plt.title("CR as a function of CTR with "+agent+" agent")
     plt.legend()
     plt.show()
-
 
 
 

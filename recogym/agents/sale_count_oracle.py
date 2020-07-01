@@ -11,11 +11,19 @@ from recogym.envs.reco_env_v1_sale import RecoEnv1Sale
 def sig(x):
     return 1.0 / (1.0 + np.exp(-x))
 
+
+######################### The following oracles can be used if there is NO direct landing 
+######################### On clicked products
+
 class SaleCountOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product conversion features only
+    The recommended product is just argmax_{a} P(sale | a is recommended, a is clicked, a is viewed)
+    The oracle just compares the different products, not the incremental increase of the probability of sale
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
@@ -26,6 +34,7 @@ class SaleCountOracleAgent(Agent, RecoEnv1Sale):
         """Make a recommendation"""
         self.delta = self.env.delta
         embed = np.array([((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:]) @ self.Lambda[int(a),:] for a in range(self.env.config.num_products)])
+        # It is enough to take the argmax on the embedding dot products since the mapping to a proba is increasing
         action = np.argmax(embed)
         self.list_actions.append(action)
         
@@ -56,12 +65,16 @@ class SaleCountOracleAgent(Agent, RecoEnv1Sale):
 
 
 class ViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
-    """
-    Sale Oracle
+  """
+    View Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product Views + Conversion features 
+    The recommended product is just argmax_{a} P(a is viewed)P(sale | a is recommended, a is clicked, a is viewed)
+    The oracle just compares the different products, not the incremental increase of the probability of sale
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
-
+    
     def __init__(self, env):
         super(ViewSaleCountOracleAgent, self).__init__(env)
         self.env = env
@@ -124,16 +137,17 @@ class ViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
 
 
 
-
-
-
-
 class ClickSaleCountOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Click Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and product Click + Conversion features 
+    The recommended product is just argmax_{a} P(a is clicked)P(sale | a is recommended, a is clicked, a is viewed)
+    The oracle just compares the different products, not the incremental increase of the probability of sale
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
+
 
     def __init__(self, env):
         super(ClickSaleCountOracleAgent, self).__init__(env)
@@ -154,7 +168,7 @@ class ClickSaleCountOracleAgent(Agent, RecoEnv1Sale):
         proba_click = np.array([ff(self.user_feature_click[:,0]@self.beta[int(a),:] + self.mu_bandit[int(a)]) for a in range(self.env.config.num_products)])
         proba_click = proba_click[:,0]
         
-        # Difference in sale mean for each product if the product is recommended
+        # sale mean for each product if the product is recommended
         proba_with_click = np.array([sig(((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:])@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
         
         # Take argmax
@@ -196,16 +210,19 @@ class ClickSaleCountOracleAgent(Agent, RecoEnv1Sale):
         self.list_actions = []
         
         
-        
-        
+
         
         
         
 class ClickViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Click View Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to user features and all product features (Views + Conversion + Click features)
+    The recommended product is just argmax_{a} P(a is viewed)P(a is clicked)P(sale | a is recommended, a is clicked, a is viewed)
+    The oracle just compares the different products, not the incremental increase of the probability of sale
+    This oracle can be used if there is no direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env):
@@ -238,7 +255,7 @@ class ClickViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
         proba_view = proba_view / proba_view.sum()
         proba_view = proba_view[:,0]
         
-        # Difference in sale mean for each product if the product is recommended
+        # sale mean for each product if the product is recommended
         proba_with_click = np.array([sig(((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:])@self.Lambda[int(a),:]) for a in range(self.env.config.num_products)])
         
         # Take argmax
@@ -287,13 +304,33 @@ class ClickViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
         
         
         
+        
+        
+        
+        
+####################################################################################################    
+######################### The following oracles can be used if there is a direct landing 
+######################### On clicked products
+
 from ..envs.utils_sale import expected_sale_given_action_click
         
 class ClickViewExpectSalesCountOracleAgent(Agent, RecoEnv1Sale):
     """
-    Sale Oracle
+    Click View Expect Sale Count Oracle 
 
-    Has access to user and product features and popularity
+    Has access to all user and product features.
+    The goal is to estimate the expected number of sale in the organic session following a reco,
+    divided by the probability of not clicking on the reco. 
+    For this, we maximize : 
+        E[#sales in next organic session given a click for a]*P(c=1|A=a)/P(c=0|A=a)
+    where :
+    E[#sales in next organic session given a click for a] = P(buy a | A=a,c=1,view a) + 
+                                              (E[length of organic session]-1)\sum_{product}P(view product)P(buy product | view product)
+    The ratio of probabilities may become very large, thus an upper bound M on the ratio can be provided
+    
+    The oracle just compares the different products, not the incremental increase of the probability of sale
+    This oracle can be used if there is a direct landing on the product's page after a click
+    
     """
 
     def __init__(self, env, M=1e3):
@@ -317,7 +354,7 @@ class ClickViewExpectSalesCountOracleAgent(Agent, RecoEnv1Sale):
         proba_click = np.array([ff(self.user_feature_click[:,0]@self.beta[int(a),:] + self.mu_bandit[int(a)]) for a in range(self.env.config.num_products)])
         proba_click = proba_click[:,0]
         
-        # Difference in expectation whether the embedding gets updated or not
+        # Expectated sales if the embedding gets updated 
         expectation = [expected_sale_given_action_click(self.env, a, user_update = True) for a in range(self.env.config.num_products)]
         
         # Take argmax

@@ -186,7 +186,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
                         self.current_time,
                         self.current_user_id
                     ),
-                    sessions
+                    sessions,
+                    click = None
                 ),
                 0,  ##H or set back to none ?## or sales ? 
                 self.state == stop,
@@ -196,9 +197,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
         assert (action_id is not None)
         # Calculate reward from action.
         click = self.draw_click(action_id)
-        
-        # Add whether the ad was clicked as info
-        info = {'click' : click} ##H
 
         self.update_state()
 
@@ -223,11 +221,12 @@ class RecoEnv1Sale(AbstractEnv): ##H
         return (
             Observation(
                 DefaultContext(self.current_time, self.current_user_id),
-                sessions
+                sessions,
+                {'click':click}
             ),
             reward, 
             self.state == stop,
-            info
+            {}
         )
     
 
@@ -261,11 +260,12 @@ class RecoEnv1Sale(AbstractEnv): ##H
                 action,
                 Observation(
                     DefaultContext(self.current_time, self.current_user_id),
-                    self.empty_sessions
+                    self.empty_sessions,
+                    {'click': 0}
                 ),
                 0, 
                 done, 
-                {'click': 0} ##H
+                {}
             )
         else:
             observation, reward, done, info = self.step(
@@ -316,15 +316,16 @@ class RecoEnv1Sale(AbstractEnv): ##H
                 data['ps'].append(None)
                 data['ps-a'].append(None)
 
-        def _store_bandit(action, reward, info):
+        def _store_bandit(action, reward, observation):
             if action:
+                click = observation.click['click'] if observation.click is not None else 0
                 assert (reward is not None)
                 data['t'].append(action['t'])
                 data['u'].append(action['u'])
                 data['z'].append('bandit')
                 data['v'].append(None)
                 data['a'].append(action['a'])
-                data['c'].append(info['click']) ##H
+                data['c'].append(click) ##H
                 data['r'].append(reward)
                 data['ps'].append(action['ps'])
                 data['ps-a'].append(action['ps-a'] if 'ps-a' in action else ())
@@ -346,14 +347,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
                 action, observation, reward, done, info = self.step_offline(
                     observation, reward, done, info
                 )
-                _store_bandit(action, reward, info)
+                _store_bandit(action, reward, observation)
 
             _store_organic(observation)
             action, _, reward, done, info = self.step_offline(
                 observation, reward, done, info
             )
             assert done, 'Done must not be changed!'
-            _store_bandit(action, reward, info)
+            _store_bandit(action, reward, observation)
 
         data['t'] = np.array(data['t'], dtype=np.float32)
         data['u'] = pd.array(data['u'], dtype=pd.UInt16Dtype())
