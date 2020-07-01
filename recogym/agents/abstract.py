@@ -15,7 +15,7 @@ class Agent:
     def __init__(self, config):
         self.config = config
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info=None):
         """An act method takes in an observation, which could either be
            `None` or an Organic_Session (see recogym/session.py) and returns
            a integer between 0 and num_products indicating which product the
@@ -295,10 +295,10 @@ class ModelBasedAgent(Agent):
         self.feature_provider = None
         self.model = None
 
-    def train(self, observation, action, reward, done=False):
+    def train(self, observation, action, reward, done=False, info=None):
         self.model_builder.train(observation, action, reward, done)
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info=None):
         if self.model is None:
             assert (self.feature_provider is None)
             self.feature_provider, self.model = self.model_builder.build()

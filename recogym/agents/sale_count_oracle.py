@@ -22,7 +22,7 @@ class SaleCountOracleAgent(Agent, RecoEnv1Sale):
         super(SaleCountOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Make a recommendation"""
         self.delta = self.env.delta
         embed = np.array([((1-self.kappa)*self.delta[:,0] + self.kappa*self.Lambda[int(a),:]) @ self.Lambda[int(a),:] for a in range(self.env.config.num_products)])
@@ -66,7 +66,7 @@ class ViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
         super(ViewSaleCountOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -139,7 +139,7 @@ class ClickSaleCountOracleAgent(Agent, RecoEnv1Sale):
         super(ClickSaleCountOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -212,7 +212,7 @@ class ClickViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
         super(ClickViewSaleCountOracleAgent, self).__init__(env)
         self.env = env
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -302,7 +302,7 @@ class ClickViewExpectSalesCountOracleAgent(Agent, RecoEnv1Sale):
         self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
         self.M = M
 
-    def act(self, observation, reward, done, info):
+    def act(self, observation, reward, done, info=None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta

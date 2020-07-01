@@ -19,9 +19,9 @@ class RandomAgent(Agent):
         super(RandomAgent, self).__init__(config)
         self.rng = RandomState(config.random_seed)
 
-    def act(self, observation, reward, done):
+    def act(self, observation, reward, done, info=None):
         return {
-            **super().act(observation, reward, done),
+            **super().act(observation, reward, done, info),
             **{
                 'a': self.rng.choice(self.config.num_products),
                 'ps': 1.0 / float(self.config.num_products),
