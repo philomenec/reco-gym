@@ -125,7 +125,7 @@ def evaluate_agent_sale(
                         failures_greedy += 1
                     failures += 1
                     
-                if (observation.click is not None) and (observation.click == 1):
+                if (new_observation.click is not None) and (new_observation.click[len(new_observation.click)-1]["click"] == 1): #modif
                     successes_click += 1
                     if ('greedy' in action) and action['greedy']:
                         successes_greedy_click += 1
@@ -776,7 +776,7 @@ def evaluate_IPS_sale(agent, reco_log):
             if z[jj] == 'organic':
                 session.next(DefaultContext(t[jj], u), int(v[jj]))
             else:
-                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[
+                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[ #modif
                     'ps-a']
                 
                 if prob_policy!=():
@@ -810,7 +810,7 @@ def evaluate_SNIPS_sale(agent, reco_log):
             if z[jj] == 'organic':
                 session.next(DefaultContext(t[jj], u), int(v[jj]))
             else:
-                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[
+                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[ #modif
                     'ps-a']
                 rewards.append(r[jj]) 
                 rewards_click.append(c[jj])
@@ -906,7 +906,7 @@ def evaluate_recall_at_k_sale(agent, reco_log, k=5):
             if z[jj] == 'organic':
                 session.next(DefaultContext(t[jj], u), int(v[jj]))
             else:
-                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[
+                prob_policy = agent.act(Observation(DefaultContext(t[jj], u), session), 0, False)[ #modif
                     'ps-a']
                 # Does the next session exist?
                 if (jj + 1) < len(z):

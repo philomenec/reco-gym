@@ -187,7 +187,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
                         self.current_user_id
                     ),
                     sessions,
-                    click = None
+                    click = [] #modif
                 ),
                 0,  ##H or set back to none ?## or sales ? 
                 self.state == stop,
@@ -197,6 +197,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
         assert (action_id is not None)
         # Calculate reward from action.
         click = self.draw_click(action_id)
+        self.clicks = self.clicks + [{'t':self.current_time, 'u':self.current_user_id,
+                                      'a': action_id, 'click':click}]
 
         self.update_state()
 
@@ -222,7 +224,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             Observation(
                 DefaultContext(self.current_time, self.current_user_id),
                 sessions,
-                {'click':click}
+                self.clicks #modif
             ),
             reward, 
             self.state == stop,
@@ -256,12 +258,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         if done:
             self.user_embedding_list[len(self.user_embedding_list)-1]["end"] = self.delta
+            self.clicks = self.clicks + [{'t':self.current_time, 'u':self.current_user_id,
+                                          'a': action, 'click':0}] #modif
             return (
                 action,
                 Observation(
                     DefaultContext(self.current_time, self.current_user_id),
                     self.empty_sessions,
-                    {'click': 0}
+                    self.clicks #modif
                 ),
                 0, 
                 done, 
@@ -318,7 +322,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         def _store_bandit(action, reward, observation):
             if action:
-                click = observation.click['click'] if observation.click is not None else 0
+                click = observation.click[len(observation.click)-1]['click'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
                 assert (reward is not None)
                 data['t'].append(action['t'])
                 data['u'].append(action['u'])
@@ -423,6 +427,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # )
         self.current_user_ps = self.config.psale_scale
         self.user_ps_list.append(self.current_user_ps)
+        self.clicks = []
 
     # Update user state to one of (organic, bandit, leave) and their omega (latent factor).
     def update_state(self):

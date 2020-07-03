@@ -144,7 +144,7 @@ class ViewSaleOracleAgent(Agent, RecoEnv1Sale):
 
 
 class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
-"""
+    """
     Click Sale Oracle 
 
     Has access to user features and product Click + Conversion features 
@@ -152,7 +152,6 @@ class ClickSaleOracleAgent(Agent, RecoEnv1Sale):
         argmax_{a} P(a is clicked)[P(sale | a is recommended, a is clicked, a is viewed) - P(sale | a is not recommended, a is viewed)]
     The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
     This oracle can be used if there is no direct landing on the product's page after a click
-    
     """
 
     def __init__(self, env):
@@ -405,14 +404,13 @@ class ClickViewExpectSalesOracleAgent(Agent, RecoEnv1Sale):
         self.mu_bandit = self.env.mu_bandit
         self.list_actions = []
 
-        
-        
-        
-        
+
+
+
 class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
      """
     Click View Expect Ghost Sale Oracle 
-
+    
     Has access to all user and product features.
     The goal is to estimate the expected number of sale in the organic session following a reco,
     compared to the one if only ghost ads are shown during the length of the organic session we compare it with.
@@ -426,15 +424,14 @@ class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
     
     The oracle is incremental, it derives the impact of a reco compared to the impact in absence of reco
     This oracle can be used if there is a direct landing on the product's page after a click
-    
     """
+    
+     def __init__(self, env):
+         super(ClickViewExpectGhostSalesOracleAgent, self).__init__(env)
+         self.env = env
+         self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
 
-    def __init__(self, env):
-        super(ClickViewExpectGhostSalesOracleAgent, self).__init__(env)
-        self.env = env
-        self.p_transition_out_of_organic = env.config.prob_leave_organic + env.config.prob_organic_to_bandit
-
-    def act(self, observation, reward, done, info = None):
+     def act(self, observation, reward, done, info = None):
         """Make a recommendation"""
         self.omega = self.env.omega
         self.delta = self.env.delta
@@ -481,10 +478,10 @@ class ClickViewExpectGhostSalesOracleAgent(Agent, RecoEnv1Sale):
             },
         }
 
-    def history(self):
+     def history(self):
         return self.list_actions
 
-    def reset(self):
+     def reset(self):
         self.list_actions = []
         self.omega = self.env.omega
         self.delta = self.env.delta
