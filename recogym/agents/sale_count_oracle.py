@@ -65,8 +65,8 @@ class SaleCountOracleAgent(Agent, RecoEnv1Sale):
 
 
 class ViewSaleCountOracleAgent(Agent, RecoEnv1Sale):
-  """
-    View Sale Count Oracle 
+    """
+     View Sale Count Oracle 
 
     Has access to user features and product Views + Conversion features 
     The recommended product is just argmax_{a} P(a is viewed)P(sale | a is recommended, a is clicked, a is viewed)
