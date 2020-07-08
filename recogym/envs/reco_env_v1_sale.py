@@ -106,13 +106,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
             if sale : 
                 # self.state is not updated to stay in the organic state 
                 # it is only updated in the sessions object
-                self.current_time +=1 
+                self.current_time = self.time_generator.new_time()
                 session.next(
                     DefaultContext(self.current_time, self.current_user_id),
                     self.product_view,
                     sale
                     )
 
+            
             # Update markov state.
             self.update_state()
         
@@ -132,7 +133,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             if sale : 
                 # self.state is not updated to stay in the organic state 
                 # it is only updated in the sessions object
-                self.current_time +=1 
+                self.current_time = self.time_generator.new_time()
                 session.next(
                     DefaultContext(self.current_time, self.current_user_id),
                     self.product_view,
@@ -198,7 +199,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # Calculate reward from action.
         click = self.draw_click(action_id)
         self.clicks = self.clicks + [{'t':self.current_time, 'u':self.current_user_id,
-                                      'a': action_id, 'click':click}]
+                                      'a': action_id, 'c':click}]
 
         self.update_state()
 
@@ -241,7 +242,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             assert (hasattr(self, 'agent'))
             assert (observation is not None)
             if self.agent:
-                action = self.agent.act(observation, reward, done, info)
+                action = self.agent.act(observation, reward, done)
             else:
                 # Select a Product randomly.
                 action = {
@@ -259,7 +260,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         if done:
             self.user_embedding_list[len(self.user_embedding_list)-1]["end"] = self.delta
             self.clicks = self.clicks + [{'t':self.current_time, 'u':self.current_user_id,
-                                          'a': action, 'click':0}] #modif
+                                          'a': action, 'c':0}] #modif
             return (
                 action,
                 Observation(
@@ -273,7 +274,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             )
         else:
             observation, reward, done, info = self.step(
-                action['a'] if action is not None else None
+                None if action is None else action['a']
             )
 
             return action, observation, reward, done, info
@@ -322,7 +323,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         def _store_bandit(action, reward, observation):
             if action:
-                click = observation.click[len(observation.click)-1]['click'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
+                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
                 assert (reward is not None)
                 data['t'].append(action['t'])
                 data['u'].append(action['u'])
