@@ -127,7 +127,7 @@ class SingleActionAgent(Agent):
         }
     
     
-# from https://github.com/criteo-research/bandit-reco/
+# (slightly modified) from https://github.com/criteo-research/bandit-reco/
 class PopularityAgent(Agent):
     def __init__(self, config):
         # Set number of products as an attribute of the Agent.
@@ -136,10 +136,14 @@ class PopularityAgent(Agent):
         # Track number of times each item viewed in Organic session.
         self.organic_views = np.zeros(self.config.num_products)
 
+    def logging_pretrain(self, data):
+        """from logs"""
+        self.organic_views = [np.sum(data["v"]==p) for p in range(self.config.num_products)]
+    
     def train(self, observation, action, reward, done):
         """Train method learns from a tuple of data.
             this method can be called for offline or online learning"""
-
+        
         # Adding organic session to organic view counts.
         if observation:
             for session in observation.sessions():
@@ -148,9 +152,8 @@ class PopularityAgent(Agent):
     def act(self, observation, reward, done, info=None):
         """Act method returns an action based on current observation and past
             history"""
-
         # Choosing action randomly in proportion with number of views.
-        prob = self.organic_views / sum(self.organic_views)
+        prob = np.ones(len(self.organic_views))/len(self.organic_views) if sum(self.organic_views)==0 else self.organic_views / sum(self.organic_views)
         action = choice(self.config.num_products, p = prob)
 
         return {
@@ -160,6 +163,7 @@ class PopularityAgent(Agent):
                 'ps': prob[action]
             }
         }
+    
     
     
 

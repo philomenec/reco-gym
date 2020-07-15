@@ -53,8 +53,9 @@ env_1_sale_args = {
         'sigma_Lambda' : 1,
         # 'user_propensity' : {'a':2, 'b':6}, # propensity of buying of users, drawn from a beta distribution
         'psale_scale' : 0.15, # scaling coefficient for the probability of drawing a sale
-        'delta_for_clicks' : 1,
-        'delta_for_views' : 0
+        'delta_for_clicks' : 0,
+        'delta_for_views' : 0,
+        'sig_coef':1
     }
 }
 
@@ -62,6 +63,10 @@ env_1_sale_args = {
 @njit(nogil=True)
 def sig(x):
     return 1.0 / (1.0 + np.exp(-x))
+
+
+def flatsig(x,coef=1):
+    return 1.0 / (1.0 + np.exp(-coef*x))
 
 
 # Maps behaviour into ctr - organic has real support ctr is on [0,1].
@@ -99,7 +104,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
             )
             
             # Draw a sale and update total number of sales
-            sale = self.draw_sale(self.product_view) ##H
+            sale = self.draw_sale(self.product_view, 
+                                  coef=self.config.sig_coef if not None else 1)
             sales += sale ##H
             
             ##H
@@ -529,10 +535,10 @@ class RecoEnv1Sale(AbstractEnv): ##H
             self.normalize_beta()
          
     ##H
-    def draw_sale(self, a):
+    def draw_sale(self, a, coef=1):
         ''' Draw sale following a Bernoulli'''
         # compute the sigmoid over the embeddings dot product
-        p_sale = sig(self.Lambda[int(a),:] @ (self.delta))[0]
+        p_sale = flatsig(self.Lambda[int(a),:] @ (self.delta), coef=coef)[0]
         self.proba_sales[self.current_user_id].append(p_sale)
         
         # add the user propensity to buy (personnalized or generic)
@@ -552,4 +558,3 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # add_term = np.expand_dims(self.config.kappa*self.Lambda[int(a),:], axis=1)
         # self.omega = (self.omega + add_term)/omega_norm
         self.delta = (1-self.config.kappa)*self.delta + self.config.kappa*np.expand_dims(self.Lambda[int(a),:], axis=1)
-

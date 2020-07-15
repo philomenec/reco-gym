@@ -700,7 +700,7 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
             agents[agent_id].reset()
         
         data = env.generate_logs(number_of_users, agents[agent_id])
-        data_list[agent_id] = data[data["a"] >= 0][data["c"] > 0]
+        data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
         embed_list[agent_id] = env.user_embedding_list
         config_list[agent_id] = {"beta":env.beta,"Lambda":env.Lambda,"Gamma":env.Gamma,"psale_scale":env.config.psale_scale}
         bandits = data[data['z'] == 'bandit']
