@@ -347,7 +347,6 @@ class SaleLikelihoodAgent(Agent):
         self.model = None
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
-        self.ctr = None
         
     @property
     def num_products(self):
@@ -366,11 +365,12 @@ class SaleLikelihoodAgent(Agent):
                                                                         self.reward_provider)
         
         rewards = (rewards > 0)*1
-        # estimate sales rate (boolean)
-        count_actions = np.unique(actions,return_counts = True)[1]
-        # assert len(count_actions) == self.num_products
-        count_sales_bool = np.array([len(np.where((actions==_) & (rewards>0))[0]) for _ in range(self.num_products)])
-        self.salesrate = count_sales_bool / count_actions
+        # # estimate sales rate (boolean)
+        # count_actions = np.unique(actions,return_counts = True)[1]
+        # # assert len(count_actions) == self.num_products
+        # count_sales_bool = np.array([len(np.where((actions==_) & (rewards>0))[0]) for _ in range(self.num_products)])
+        # self.salesrate = count_sales_bool / count_actions
+        self.cr = sum(rewards)/len(rewards)
         
         features = np.vstack([
             self._create_features(user_state, action) 
@@ -444,6 +444,160 @@ class SaleLikelihoodAgent(Agent):
             action = np.random.randint(self.num_products())
         else :
             action = np.argmax(self._score_products(user_state))
+        
+        ps = 1.0
+        all_ps = np.zeros(self.num_products)
+        all_ps[action] = 1.0        
+        
+        return {
+            **super().act(observation, reward, done),
+            **{
+                'a': action,
+                'ps': ps,
+                'ps-a': all_ps,
+            }
+        }
+
+    def reset(self):
+        self.feature_provider.reset()  
+
+
+
+class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
+    def __init__(self, feature_provider_list, reward_provider_list, discounts, epsilon_greedy = False, epsilon = 0.3, seed=43):
+        self.feature_provider_list = feature_provider_list
+        self.reward_provider_list = reward_provider_list
+        self.discounts = discounts
+        assert len(self.feature_provider_list) == len(self.reward_provider_list)
+        self.random_state = RandomState(seed)
+        self.models = []
+        self.epsilon_greedy = epsilon_greedy
+        self.epsilon = epsilon
+        self.cr = []
+        
+        
+    @property
+    def num_products(self):
+        return self.feature_provider.config.num_products
+    
+    def _create_features(self, user_state, action):
+        """Create the features that are used to estimate the expected reward from the user state"""
+        features = np.zeros(len(user_state) * self.num_products)
+        # perform kronecker product directly on the flattened version of the features matrix
+        features[action * len(user_state): (action + 1) * len(user_state)] = user_state
+        return features
+    
+    def train(self, logs):
+        for i in range(len(self.feature_provider_list)):
+            feature_provider = self.feature_provider_list[i]
+            reward_provider = self.reward_provider_list[i]
+            user_states, actions, rewards, proba_actions, self.info = build_train_data(logs, 
+                                                                            feature_provider, 
+                                                                            reward_provider)
+        
+            rewards = (rewards > 0)*1
+            self.cr.append(sum(rewards)/len(rewards))
+            
+            if self.discounts[i] != 0 :
+                features = np.vstack([
+                    self._create_features(user_state, action) 
+                    for user_state, action in zip(user_states, actions)
+                ])
+            else : 
+                features = user_states
+            
+            model = LogisticRegression(solver='lbfgs', max_iter=5000)
+            model.fit(features, rewards)
+            self.models.append(model)
+    
+    def _score_products(self, user_state, model):
+        all_action_features = np.array([
+            # How do you create the features to feed the logistic model ?
+            self._create_features(user_state, action) for action in range(self.num_products)
+        ])
+        return model.predict_proba(all_action_features)[:, 1]
+    
+    def observation_to_log(self,observation):
+        data = {
+                    't': [],
+                    'u': [],
+                    'z': [],
+                    'v': [],
+                    'a': [],
+                    'c': [],
+                    'r': [],
+                    'ps': [],
+                    'ps-a': [],
+                }
+        def _store_organic(observation):
+            assert (observation is not None)
+            assert (observation.sessions() is not None)
+            for session in observation.sessions():
+                data['t'].append(session['t'])
+                data['u'].append(session['u'])
+                data['z'].append('organic' if session['z']=='pageview' else 'sale') 
+                data['v'].append(session['v'])
+                data['a'].append(None)
+                data['c'].append(None)
+                data['r'].append(None) ##H
+                data['ps'].append(None)
+                data['ps-a'].append(None)
+
+        def _store_clicks(observation):
+            assert (observation is not None)
+            assert (observation.click is not None)
+            for session in observation.click:
+                data['t'].append(session['t'])
+                data['u'].append(session['u'])
+                data['z'].append('bandit') 
+                data['v'].append(None)
+                data['a'].append(session['a'])
+                data['c'].append(session['c'])
+                data['r'].append(None) 
+                data['ps'].append(None)
+                data['ps-a'].append(None)
+
+        _store_organic(observation)
+        _store_clicks(observation)
+        df = pd.DataFrame(data)
+        df.sort_values('t')
+        return df
+        
+    
+    def act(self, observation, reward, done):
+        """Act method returns an action based on current observation and past history"""
+        logged_observation = self.observation_to_log(observation)
+        score = np.ones(self.num_products)
+        index_discount = np.where(self.discounts != 0)[0]
+        index_discounted = index_discount + self.discounts[index_discounted]
+        
+        for i in range(len(index_discounted)):
+            ## main model
+            feature_provider = self.feature_provider_list[index_discounted[i]]
+            feature_provider.observe(logged_observation)      
+            user_state = feature_provider.features()
+            before_discount = self._score_products(user_state, 
+                                                   self.models[index_discounted[i]])
+            
+            ## model used as discount
+            feature_provider = self.feature_provider_list[index_discount[i]]
+            feature_provider.observe(logged_observation)      
+            user_state = feature_provider.features()
+            after_discount = before_discount - self.models[index_discount[i]].predict_proba(user_state)
+            score = score*after_discount
+        
+        for i in set(range(len(self.feature_provider_list)))-set.union(set(index_discount),set(index_discounted)):
+            feature_provider = self.feature_provider_list[i]
+            feature_provider.observe(logged_observation)      
+            user_state = feature_provider.features()
+            score = score*self._score_products(user_state, self.models[i])
+            print(score.shape)
+            
+        if (self.epsilon_greedy == True) & (np.random.rand() < self.epsilon) : 
+            print("Explore")
+            action = np.random.randint(self.num_products())
+        else :
+            action = np.argmax(score)
         
         ps = 1.0
         all_ps = np.zeros(self.num_products)

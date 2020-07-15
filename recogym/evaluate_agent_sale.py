@@ -695,14 +695,15 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
     
     # One success is defined as at least 1 sale
     for agent_id in agents:
-        env.reset()
+        envcopy = deepcopy(env)
+        envcopy.reset()
         if agent_reset == True :
             agents[agent_id].reset()
         
-        data = env.generate_logs(number_of_users, agents[agent_id])
+        data = envcopy.generate_logs(number_of_users, agents[agent_id])
         data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
-        embed_list[agent_id] = env.user_embedding_list
-        config_list[agent_id] = {"beta":env.beta,"Lambda":env.Lambda,"Gamma":env.Gamma,"psale_scale":env.config.psale_scale}
+        embed_list[agent_id] = envcopy.user_embedding_list
+        config_list[agent_id] = {"beta":env.beta,"Lambda":envcopy.Lambda,"Gamma":envcopy.Gamma,"psale_scale":envcopy.config.psale_scale}
         bandits = data[data['z'] == 'bandit']
         
         # sales rate
@@ -723,7 +724,7 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
         
          # total number of sales
         stat_tot_sales['Agent'].append(agent_id)
-        stat_tot_sales['TotSales'] = np.sum(bandits['r'])/number_of_users
+        stat_tot_sales['TotSales'].append(np.sum(data['r']>0))
         
         # share of users who bought something
         stat_share_user_sale['Agent'].append(agent_id)
