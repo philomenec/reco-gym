@@ -126,7 +126,6 @@ class MDPRewardProvider(FeatureProvider):
                 else :
                     end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
                 pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
-            pure_organic_df.index = range(len(pure_organic_df))
             data = pure_organic_df
         
         # Only keep clicked rows
@@ -177,7 +176,6 @@ class ShortTermRewardProvider(FeatureProvider):
                 else :
                     end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
                 pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
-            pure_organic_df.index = range(len(pure_organic_df))
             data = pure_organic_df
         
         # List indices that correspond to clicks
@@ -315,6 +313,10 @@ class CountViewsFeatureProvider(FeatureProvider):
     @property
     def name(self):
         return "CountViewsFeatureProvider"
+    
+    @property
+    def feature_size(self):
+        return self.num_products
 
 ## Integrate both clicks and views as features
 
@@ -358,7 +360,9 @@ class CountViewsClicksFeatureProvider(FeatureProvider):
     def name(self):
         return "CountViewsClicksFeatureProvider"
 
-
+    @property
+    def feature_size(self):
+        return 2*self.num_products
 
 
 ################################################################
@@ -395,13 +399,15 @@ def build_train_data(logs, feature_provider, reward_provider):
             # User has changed: reset user state.
             current_user = row['u'] #for checkup
             feature_provider.reset()
-        
+            feature_sum = np.zeros(feature_provider.feature_size)
+            
         feature_provider.observe(row)
+        feature_sum += feature_provider.features()
         
         if index in clicked_log.index :
-            user_states.append(feature_provider.features().copy())
-            assert clicked_log["u"][index] == current_user
-
+            user_states.append(feature_sum)
+            assert clicked_log["u"][index] == current_user  
+    
     return (np.array(user_states), 
             np.array(clicked_log["a"]).astype(int), 
             np.array(clicked_log["y"].astype(int)), 
@@ -428,6 +434,8 @@ class SaleLikelihoodAgent(Agent):
         self.model = None
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
+        self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
+                                   'c': [],'r': [],'ps': [], 'ps-a': []}
         
     @property
     def num_products(self):
@@ -435,9 +443,10 @@ class SaleLikelihoodAgent(Agent):
     
     def _create_features(self, user_state, action):
         """Create the features that are used to estimate the expected reward from the user state"""
-        features = np.zeros(len(user_state) * self.num_products)
+        features = np.zeros(len(user_state) + self.num_products)
         # perform kronecker product directly on the flattened version of the features matrix
-        features[action * len(user_state): (action + 1) * len(user_state)] = user_state
+        features[:len(user_state)] = user_state
+        features[int(len(user_state) + action)] = 1
         return features
     
     def train(self, logs):
@@ -446,40 +455,30 @@ class SaleLikelihoodAgent(Agent):
                                                                         self.reward_provider)
         
         rewards = (rewards > 0)*1
-        # # estimate sales rate (boolean)
-        # count_actions = np.unique(actions,return_counts = True)[1]
-        # # assert len(count_actions) == self.num_products
-        # count_sales_bool = np.array([len(np.where((actions==_) & (rewards>0))[0]) for _ in range(self.num_products)])
-        # self.salesrate = count_sales_bool / count_actions
         self.cr = sum(rewards)/len(rewards)
         
-        features = np.vstack([
-            self._create_features(user_state, action) 
-            for user_state, action in zip(user_states, actions)
+        actions_onehot = np.zeros((len(actions), self.num_products))
+        actions_onehot[np.arange(len(actions)),actions] = 1
+        
+        
+        features = np.hstack([
+            user_states,
+            actions_onehot
         ])
+        
         self.model = LogisticRegression(solver='lbfgs', max_iter=5000)
+        
         self.model.fit(features, rewards)
         
     
     def _score_products(self, user_state):
-        all_action_features = np.array([
-            # How do you create the features to feed the logistic model ?
-            self._create_features(user_state, action) for action in range(self.num_products)
-        ])
+        all_action_features = np.array([self._create_features(user_state,action)
+                                        for action in range(self.num_products)])
         return self.model.predict_proba(all_action_features)[:, 1]
     
     def observation_to_log(self,observation):
-        data = {
-                    't': [],
-                    'u': [],
-                    'z': [],
-                    'v': [],
-                    'a': [],
-                    'c': [],
-                    'r': [],
-                    'ps': [],
-                    'ps-a': [],
-                }
+        data = self.logged_observation
+        
         def _store_organic(observation):
             assert (observation is not None)
             assert (observation.sessions() is not None)
@@ -510,6 +509,9 @@ class SaleLikelihoodAgent(Agent):
 
         _store_organic(observation)
         _store_clicks(observation)
+        self.logged_observation = data
+        
+        # return as dataframe
         df = pd.DataFrame(data)
         df.sort_values('t')
         return df
@@ -530,6 +532,9 @@ class SaleLikelihoodAgent(Agent):
         all_ps = np.zeros(self.num_products)
         all_ps[action] = 1.0        
         
+        if done :
+            self.reset()
+        
         return {
             **super().act(observation, reward, done),
             **{
@@ -540,11 +545,13 @@ class SaleLikelihoodAgent(Agent):
         }
 
     def reset(self):
-        self.feature_provider.reset()  
+        self.feature_provider.reset() 
+        self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
+                                   'c': [],'r': [],'ps': [], 'ps-a': []}
 
 
 
-class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
+class SaleProductLikelihoodAgent(Agent):
     def __init__(self, feature_provider_list, reward_provider_list, discounts, epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider_list = feature_provider_list
         self.reward_provider_list = reward_provider_list
@@ -562,6 +569,8 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
         self.index_discount = np.where(self.discounts != 0)[0]
         # Indices of discounted models
         self.index_discounted = self.index_discount + self.discounts[self.index_discount]
+        self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
+                                   'c': [],'r': [],'ps': [], 'ps-a': []}
         
     @property
     def num_products(self):
@@ -569,9 +578,10 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
     
     def _create_features(self, user_state, action):
         """Create the features that are used to estimate the expected reward from the user state"""
-        features = np.zeros(len(user_state) * self.num_products)
+        features = np.zeros(len(user_state) + self.num_products)
         # perform kronecker product directly on the flattened version of the features matrix
-        features[action * len(user_state): (action + 1) * len(user_state)] = user_state
+        features[:len(user_state)] = user_state
+        features[int(len(user_state) + action)] = 1
         return features
     
     def train(self, logs):
@@ -580,7 +590,6 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
             # Build training data
             feature_provider = self.feature_provider_list[i]
             reward_provider = self.reward_provider_list[i]
-            print("Model number "+str(i))
             user_states, actions, rewards, proba_actions, info = build_train_data(logs, 
                                                                             feature_provider, 
                                                                             reward_provider)
@@ -598,11 +607,15 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
             
             # Build features 
             if self.discounts[i] == 0 :
-                # Include action
-                features = np.vstack([
-                    self._create_features(user_state, action) 
-                    for user_state, action in zip(user_states, actions)
+                # Include action               
+                actions_onehot = np.zeros((len(actions), self.num_products))
+                actions_onehot[np.arange(len(actions)),actions] = 1
+                
+                features = np.hstack([
+                    user_states,
+                    actions_onehot
                 ])
+                
             else :
                 # Models used as discounts don't use actions
                 features = user_states
@@ -614,23 +627,13 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
     
     def _score_products(self, user_state, model):
         all_action_features = np.array([
-            # How do you create the features to feed the logistic model ?
             self._create_features(user_state, action) for action in range(self.num_products)
         ])
         return model.predict_proba(all_action_features)[:, 1]
     
     def observation_to_log(self,observation):
-        data = {
-                    't': [],
-                    'u': [],
-                    'z': [],
-                    'v': [],
-                    'a': [],
-                    'c': [],
-                    'r': [],
-                    'ps': [],
-                    'ps-a': [],
-                }
+        data = self.logged_observation
+        
         def _store_organic(observation):
             assert (observation is not None)
             assert (observation.sessions() is not None)
@@ -661,6 +664,8 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
 
         _store_organic(observation)
         _store_clicks(observation)
+        self.logged_observation = data
+        
         df = pd.DataFrame(data)
         df.sort_values('t')
         return df
@@ -680,7 +685,7 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
             for i in range(len(self.index_discounted)):
                 ## main (discounted) model 
                 feature_provider = self.feature_provider_list[self.index_discounted[i]]
-                feature_provider.observe(logged_observation)      
+                feature_provider.observe(logged_observation) 
                 user_state = feature_provider.features()
                 before_discount = self._score_products(user_state, 
                                                        self.models[self.index_discounted[i]])
@@ -689,26 +694,28 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
                 feature_provider = self.feature_provider_list[self.index_discount[i]]
                 feature_provider.observe(logged_observation)      
                 user_state = feature_provider.features()
+                user_state = user_state.reshape(1, -1)
                 discount_val = self.models[self.index_discount[i]].predict_proba(user_state)
-                
+                discount_val = discount_val[0][1]
                 ## Combine the two models
                 # Clip discounted score to avoid negatives
                 after_discount = np.clip(before_discount - discount_val,a_min=0,a_max=1)
                 score = score*after_discount
-                print(score.shape)
             
             for i in set(range(self.num_models))-set.union(set(self.index_discount),set(self.index_discounted)):
                 feature_provider = self.feature_provider_list[i]
                 feature_provider.observe(logged_observation)      
                 user_state = feature_provider.features()
                 score = score*self._score_products(user_state, self.models[i])
-                print(score.shape)
             
             action = np.argmax(score)
         
         ps = 1.0
         all_ps = np.zeros(self.num_products)
         all_ps[action] = 1.0        
+        
+        if done :
+            self.reset()
         
         return {
             **super().act(observation, reward, done),
@@ -722,6 +729,9 @@ class SaleProductLikelihoodAgent(SaleLikelihoodAgent):
     def reset(self):
         for i in range(self.num_models):
             self.feature_provider_list[i].reset()  
+            
+        self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
+                                   'c': [],'r': [],'ps': [], 'ps-a': []}
 
 
 

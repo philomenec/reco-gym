@@ -1,4 +1,6 @@
 *.txt
+*Copy*
+*Copie*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
