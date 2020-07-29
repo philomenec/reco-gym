@@ -126,19 +126,28 @@ class MDPRewardProvider(FeatureProvider):
                 else :
                     end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
                 pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
+                # remove bandit events
+                pure_organic_df = pure_organic_df.loc[pure_organic_df["z"] != 'bandit']
             data = pure_organic_df
+            # add a reward in case of a sale and artificially define the action as the view
+            data["y"] = (data["z"]=='sale')*1
+            data["a"] = data["v"]
+            # remove organic events followed by a sale to avoid double counting
+            data = data.loc[data.shift(-1)["z"]!="sale"]
+            self.data_rewards = data
         
-        # Only keep clicked rows
-        if self.clicks_only == True :
-            data_clicked = data.loc[data["c"]==1]
         else :
-            # Consider unclicked recos as negatives
-            data_clicked = data.loc[data["z"]=='bandit']
-            
-        # Set target as MDP reward
-        data_clicked["y"] = data_clicked["r"]
-
-        self.data_rewards = data_clicked
+            # Only keep clicked rows
+            if self.clicks_only == True :
+                data_clicked = data.loc[data["c"]==1]
+            else :
+                # Consider unclicked recos as negatives
+                data_clicked = data.loc[data["z"]=='bandit']
+                
+            # Set target as MDP reward
+            data_clicked["y"] = data_clicked["r"]
+    
+            self.data_rewards = data_clicked
 
     def features(self):
         return self.data_rewards
@@ -154,7 +163,84 @@ class MDPRewardProvider(FeatureProvider):
         if self.organic_only :
             name += "_pureorganic"
         return name
+       
+    
+## N1 : Only attribute reward if any product is sold before the next clicked recommendation
+class NonPersoShortTermRewardProvider(FeatureProvider):
+    """Reward shaping class"""
+
+    def __init__(self, clicks_only=True, organic_only=False):
+        self.data_rewards = None
+        self.clicks_only = clicks_only
+        self.organic_only = organic_only
         
+    def observe(self, data):
+        
+        if self.organic_only :
+            # Only keep data before first clicked reco 
+            pure_organic_df = data[:0].copy()
+            for u in data["u"].unique():
+                beginning_index = data[data["u"]==u].index[0]
+                if len(data[data["u"]==u].loc[data["c"]==1])>0:
+                    end_index = data[data["u"]==u].loc[data["c"]==1].index[0] #dont include the first click
+                else :
+                    end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
+                pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
+                # remove bandit events
+                pure_organic_df = pure_organic_df.loc[pure_organic_df["z"] != 'bandit']
+            data = pure_organic_df
+            # add a reward in case of a sale and artificially define the action as the view
+            data["y"] = (data["z"]=='sale')*1
+            data["a"] = data["v"]
+            # remove organic events followed by a sale to avoid double counting
+            data = data.loc[data.shift(-1)["z"]!="sale"]
+            self.data_rewards = data
+        
+        else :
+            # List indices that correspond to clicks
+            clicked_indices = list(data.loc[data["c"]==1].index)
+    
+            # Only keep clicked rows
+            if self.clicks_only == True :
+                data_clicked = data.loc[data["c"]==1]
+            else :
+                # Consider unclicked recos as negatives
+                data_clicked = data.loc[data["z"]=='bandit']
+            data_clicked["y"] = 0
+    
+            last_user_clicked = list(data.loc[data["u"]==data.iloc[clicked_indices[len(clicked_indices)-1]].loc["u"]].index)
+            last_user_clicked = last_user_clicked[len(last_user_clicked)-1] +1
+    
+            # add one value to clicked indices : the last row for the last user who clicked
+            clicked_indices += [last_user_clicked]
+    
+            for i in range(len(clicked_indices)-1):
+                # Only keep the indices before the next time the user clicks
+                data_slice = data.iloc[clicked_indices[i]:clicked_indices[i+1]]
+                # Only keep the observations for the same user
+                data_slice = data_slice.loc[data_slice["u"]==data_slice["u"].iloc[0]]
+    
+                # Count the number of times a sale for the recommended product is observed in the time frame of interest
+                data_clicked["y"].iloc[i] = len(data_slice.loc[(data_slice["z"]=="sale")])
+            self.data_rewards = data_clicked
+
+    def features(self):
+        return self.data_rewards
+    
+    def reset(self):
+        self.data_rewards = None
+
+    @property
+    def name(self):
+        name = "ShortTermRewardProvider"
+        if self.clicks_only == False:
+            name += "_all"
+        if self.organic_only :
+            name += "_pureorganic"
+        return name
+    
+    
+    
 ## V1 : Only attribute reward if the recommended product is sold before the next clicked recommendation
 class ShortTermRewardProvider(FeatureProvider):
     """Reward shaping class"""
@@ -176,34 +262,43 @@ class ShortTermRewardProvider(FeatureProvider):
                 else :
                     end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
                 pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
+                # remove bandit events
+                pure_organic_df = pure_organic_df.loc[pure_organic_df["z"] != 'bandit']
             data = pure_organic_df
-        
-        # List indices that correspond to clicks
-        clicked_indices = list(data.loc[data["c"]==1].index)
-
-        # Only keep clicked rows
-        if self.clicks_only == True :
-            data_clicked = data.loc[data["c"]==1]
+            # add a reward in case of a sale and artificially define the action as the view
+            data["y"] = (data["z"]=='sale')*1
+            data["a"] = data["v"]
+            # remove organic events followed by a sale to avoid double counting
+            data = data.loc[data.shift(-1)["z"]!="sale"]
+            self.data_rewards = data
+            
         else :
-            # Consider unclicked recos as negatives
-            data_clicked = data.loc[data["z"]=='bandit']
-        data_clicked["y"] = 0
-
-        last_user_clicked = list(data.loc[data["u"]==data.iloc[clicked_indices[len(clicked_indices)-1]].loc["u"]].index)
-        last_user_clicked = last_user_clicked[len(last_user_clicked)-1] +1
-
-        # add one value to clicked indices : the last row for the last user who clicked
-        clicked_indices += [last_user_clicked]
-
-        for i in range(len(clicked_indices)-1):
-            # Only keep the indices before the next time the user clicks
-            data_slice = data.iloc[clicked_indices[i]:clicked_indices[i+1]]
-            # Only keep the observations for the same user
-            data_slice.loc[data_slice["u"]==data_slice["u"].iloc[0]]
-
-            # Count the number of times a sale for the recommended product is observed in the time frame of interest
-            data_clicked["y"].iloc[i] = len(data_slice.loc[(data_slice["z"]=="sale") & (data_slice["v"]==data_slice["a"].iloc[0])])
-        self.data_rewards = data_clicked
+            # List indices that correspond to clicks
+            clicked_indices = list(data.loc[data["c"]==1].index)
+    
+            # Only keep clicked rows
+            if self.clicks_only == True :
+                data_clicked = data.loc[data["c"]==1]
+            else :
+                # Consider unclicked recos as negatives
+                data_clicked = data.loc[data["z"]=='bandit']
+            data_clicked["y"] = 0
+    
+            last_user_clicked = list(data.loc[data["u"]==data.iloc[clicked_indices[len(clicked_indices)-1]].loc["u"]].index)
+            last_user_clicked = last_user_clicked[len(last_user_clicked)-1] +1
+    
+            # add one value to clicked indices : the last row for the last user who clicked
+            clicked_indices += [last_user_clicked]
+    
+            for i in range(len(clicked_indices)-1):
+                # Only keep the indices before the next time the user clicks
+                data_slice = data.iloc[clicked_indices[i]:clicked_indices[i+1]]
+                # Only keep the observations for the same user
+                data_slice = data_slice.loc[data_slice["u"]==data_slice["u"].iloc[0]]
+    
+                # Count the number of times a sale for the recommended product is observed in the time frame of interest
+                data_clicked["y"].iloc[i] = len(data_slice.loc[(data_slice["z"]=="sale") & (data_slice["v"]==data_slice["a"].iloc[0])])
+            self.data_rewards = data_clicked
 
     def features(self):
         return self.data_rewards
@@ -383,15 +478,15 @@ def build_train_data(logs, feature_provider, reward_provider):
 
     # Define clicked logs
     reward_provider.observe(logs)
-    clicked_log = reward_provider.features()
+    train_log = reward_provider.features()
     
     if [subtext not in reward_provider.name.lower() for subtext in ('click','pure')]:
-        info = info_reward_provider(logs,clicked_log, reward_provider.name, share_sales=True)
+        info = info_reward_provider(logs,train_log, reward_provider.name, share_sales=True)
     else :
-        info = info_reward_provider(logs,clicked_log, reward_provider.name, share_sales=False)
+        info = info_reward_provider(logs,train_log, reward_provider.name, share_sales=False)
         
     # Restrict logs to users that are present in the trainset
-    logs = logs[logs["u"].isin(list(clicked_log["u"].unique()))]
+    logs = logs[logs["u"].isin(list(train_log["u"].unique()))]
     
     current_user = None #for checkup
     for index, row in logs.iterrows():
@@ -404,14 +499,15 @@ def build_train_data(logs, feature_provider, reward_provider):
         feature_provider.observe(row)
         feature_sum += feature_provider.features()
         
-        if index in clicked_log.index :
+        if index in train_log.index :
+        # if index in np.array(train_log.index)-1 :
             user_states.append(feature_sum)
-            assert clicked_log["u"][index] == current_user  
+            assert train_log["u"][index] == current_user  
     
     return (np.array(user_states), 
-            np.array(clicked_log["a"]).astype(int), 
-            np.array(clicked_log["y"].astype(int)), 
-            np.array(clicked_log["ps"]),
+            np.array(train_log["a"]).astype(int), 
+            np.array(train_log["y"].astype(int)), 
+            np.array(train_log["ps"]),
             info)
 
 
@@ -455,7 +551,7 @@ class SaleLikelihoodAgent(Agent):
                                                                         self.reward_provider)
         
         rewards = (rewards > 0)*1
-        self.cr = sum(rewards)/len(rewards)
+        # self.cr = sum(rewards)/len(rewards)
         
         actions_onehot = np.zeros((len(actions), self.num_products))
         actions_onehot[np.arange(len(actions)),actions] = 1
@@ -550,18 +646,18 @@ class SaleLikelihoodAgent(Agent):
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
 
 
-
 class SaleProductLikelihoodAgent(Agent):
-    def __init__(self, feature_provider_list, reward_provider_list, discounts, epsilon_greedy = False, epsilon = 0.3, seed=43):
+    def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider_list = feature_provider_list
         self.reward_provider_list = reward_provider_list
         self.discounts = np.array(discounts) # list that indicates which model is used to discount which other model
         assert len(self.feature_provider_list) == len(self.reward_provider_list)
         self.random_state = RandomState(seed)
         self.models = [] # each model will correspond to a fitted logistic regression
+        self.discounts_with_action = discounts_with_action
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
-        self.cr = []
+        # self.cr = []
         self.num_models = len(self.reward_provider_list)
         # Keep information about the model
         self.info = {'Name':'','Other':[]}
@@ -603,10 +699,10 @@ class SaleProductLikelihoodAgent(Agent):
             rewards = (rewards > 0)*1
             
             # Keep track of conversion rate
-            self.cr.append(sum(rewards)/len(rewards))
+            # self.cr.append(sum(rewards)/len(rewards))
             
             # Build features 
-            if self.discounts[i] == 0 :
+            if (self.discounts[i] == 0) or self.discounts_with_action :
                 # Include action               
                 actions_onehot = np.zeros((len(actions), self.num_products))
                 actions_onehot[np.arange(len(actions)),actions] = 1
@@ -619,10 +715,15 @@ class SaleProductLikelihoodAgent(Agent):
             else :
                 # Models used as discounts don't use actions
                 features = user_states
-            
+                    
+                
             # Fit logistic regression and save model
-            model = LogisticRegression(solver='lbfgs', max_iter=5000)
-            model.fit(features, rewards)
+            if len(features) > 0 :
+                model = LogisticRegression(solver='lbfgs', max_iter=5000)
+                model.fit(features, rewards)
+            else :
+                model = None
+                
             self.models.append(model)
     
     def _score_products(self, user_state, model):
@@ -695,8 +796,17 @@ class SaleProductLikelihoodAgent(Agent):
                 feature_provider.observe(logged_observation)      
                 user_state = feature_provider.features()
                 user_state = user_state.reshape(1, -1)
-                discount_val = self.models[self.index_discount[i]].predict_proba(user_state)
-                discount_val = discount_val[0][1]
+                if self.models[self.index_discount[i]] is not None :
+                    if self.discounts_with_actions == False :
+                        discount_val = self.models[self.index_discount[i]].predict_proba(user_state)
+                        discount_val = discount_val[0][1]
+                    else :
+                        discount_val = self._score_products(user_state,
+                                                            self.models[self.index_discount[i]])
+                else :
+                    print("No discount")
+                    discount_val = np.zeros(before_discount.shape)
+                    
                 ## Combine the two models
                 # Clip discounted score to avoid negatives
                 after_discount = np.clip(before_discount - discount_val,a_min=0,a_max=1)
@@ -732,6 +842,10 @@ class SaleProductLikelihoodAgent(Agent):
             
         self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
+
+
+
+
 
 
 
