@@ -2,6 +2,7 @@
 *Copy*
 *Copie*
 
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -21,6 +22,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+old/
 parts/
 sdist/
 var/

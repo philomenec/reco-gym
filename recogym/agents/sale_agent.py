@@ -14,7 +14,7 @@ import pandas as pd
 
 # from ..envs.configuration import Configuration
 # from ..envs.reco_env_v1_sale import env_1_args, ff, sig
-from .abstract import Agent
+from recogym.agents.abstract import Agent
 # from recogym.envs.reco_env_v1_sale import RecoEnv1Sale
 
 from recogym.agents import FeatureProvider
@@ -72,7 +72,7 @@ from recogym.agents import FeatureProvider
 ################################################################
 
 
-## Attribute click boolean as reward
+## (1) Attribute click boolean as reward
 
 class ClickRewardProvider(FeatureProvider):
     """Reward shaping class"""
@@ -105,7 +105,7 @@ class ClickRewardProvider(FeatureProvider):
 
 
 
-## V0 attribute the reward of the MDP
+## (2) attribute the reward of the MDP
 class MDPRewardProvider(FeatureProvider):
     """Reward shaping class"""
 
@@ -165,7 +165,7 @@ class MDPRewardProvider(FeatureProvider):
         return name
        
     
-## N1 : Only attribute reward if any product is sold before the next clicked recommendation
+## (3) : Only attribute reward if any product is sold before the next clicked recommendation
 class NonPersoShortTermRewardProvider(FeatureProvider):
     """Reward shaping class"""
 
@@ -241,7 +241,7 @@ class NonPersoShortTermRewardProvider(FeatureProvider):
     
     
     
-## V1 : Only attribute reward if the recommended product is sold before the next clicked recommendation
+## (4) : Only attribute reward if the recommended product is sold before the next clicked recommendation
 class ShortTermRewardProvider(FeatureProvider):
     """Reward shaping class"""
 
@@ -315,8 +315,7 @@ class ShortTermRewardProvider(FeatureProvider):
             name += "_pureorganic"
         return name
 
-## V2 : Attribute a reward if the product was sold later at one point during the user session
-
+## (5) Attribute a reward if the product was sold later at one point during the user session
 class CumulativeRewardProvider(FeatureProvider):
     """Reward shaping class"""
     
@@ -413,6 +412,48 @@ class CountViewsFeatureProvider(FeatureProvider):
     def feature_size(self):
         return self.num_products
 
+
+## Consider share of views instead of counts
+class ShareViewsFeatureProvider(FeatureProvider):
+    """Feature provider as an abstract class that defines interface of setting/getting features
+    The class counts both clicks and views """
+
+    def __init__(self, config):
+        super(ShareViewsFeatureProvider, self).__init__(config)
+        self.num_products = config.num_products
+        self.user_counts = np.zeros(self.num_products)
+        self.user_features = np.zeros(self.num_products)
+        
+    def observe(self, data):
+        if type(data) == pd.core.series.Series:
+            if data["z"]=="organic":
+                views = [(data["v"]==p)*1 for p in range(self.num_products)]
+            else :
+                views = np.zeros(self.num_products)
+        else :
+            data_organic = data.loc[data["z"]=="organic"].loc[data["v"]>=0]
+            views = [np.sum(data_organic["v"]==p) for p in range(self.num_products)]
+        self.user_counts = np.array(views)
+        nb_views = np.sum(self.user_counts)
+        if nb_views>0:
+            self.user_features = self.user_counts/nb_views
+        
+    def features(self):
+        """Provide feature values adjusted to a particular feature set"""
+        return self.user_features
+
+    def reset(self):
+        self.user_features = np.zeros(self.num_products)
+
+    @property
+    def name(self):
+        return "CountViewsFeatureProvider"
+    
+    @property
+    def feature_size(self):
+        return self.num_products
+
+
 ## Integrate both clicks and views as features
 
 class CountViewsClicksFeatureProvider(FeatureProvider):
@@ -440,6 +481,60 @@ class CountViewsClicksFeatureProvider(FeatureProvider):
                 if (row["z"]=='bandit') & (row["c"]==1):
                     self.click_feature[int(row["a"])] += 1 
                 
+        self.user_features = np.concatenate([self.view_feature,self.click_feature])
+        
+    def features(self):
+        """Provide feature values adjusted to a particular feature set"""
+        return self.user_features
+
+    def reset(self):
+        self.view_feature = np.zeros(self.num_products)
+        self.click_feature = np.zeros(self.num_products)
+        self.user_features = np.zeros(2*self.num_products)
+
+    @property
+    def name(self):
+        return "CountViewsClicksFeatureProvider"
+
+    @property
+    def feature_size(self):
+        return 2*self.num_products
+    
+    
+class ShareViewsClicksFeatureProvider(FeatureProvider):
+    """Feature provider as an abstract class that defines interface of setting/getting features
+    The class counts both clicks and views """
+
+    def __init__(self, config):
+        super(ShareViewsClicksFeatureProvider, self).__init__(config)
+        self.num_products = config.num_products
+        self.view_feature = np.zeros(self.num_products)
+        self.click_feature = np.zeros(self.num_products)
+        self.view_count = np.zeros(self.num_products)
+        self.click_count = np.zeros(self.num_products)
+        self.user_features = np.zeros(2*self.num_products)
+        
+    def observe(self, data):
+        if type(data) == pd.core.series.Series:
+            row = data
+            if row["z"]=='organic':
+                self.view_count[row["v"]] += 1 
+            if (row["z"]=='bandit') & (row["c"]==1):
+                self.click_count[row["a"]] += 1 
+        else :
+            for _, row in data.iterrows():
+                if row["z"]=='organic':
+                    self.view_count[int(row["v"])] += 1 
+                if (row["z"]=='bandit') & (row["c"]==1):
+                    self.click_count[int(row["a"])] += 1 
+               
+        nb_views = np.sum(self.view_count)
+        if nb_views > 0:
+            self.view_feature = self.view_feature/nb_views
+        nb_clicks = np.sum(self.click_count)
+        if nb_clicks > 0:
+            self.click_feature = self.click_feature/nb_clicks
+            
         self.user_features = np.concatenate([self.view_feature,self.click_feature])
         
     def features(self):
@@ -650,7 +745,7 @@ class SaleProductLikelihoodAgent(Agent):
     def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider_list = feature_provider_list
         self.reward_provider_list = reward_provider_list
-        self.discounts = np.array(discounts) # list that indicates which model is used to discount which other model
+        self.discounts = np.array(discounts) # list that indicates which model is used to which other model
         assert len(self.feature_provider_list) == len(self.reward_provider_list)
         self.random_state = RandomState(seed)
         self.models = [] # each model will correspond to a fitted logistic regression
@@ -797,7 +892,7 @@ class SaleProductLikelihoodAgent(Agent):
                 user_state = feature_provider.features()
                 user_state = user_state.reshape(1, -1)
                 if self.models[self.index_discount[i]] is not None :
-                    if self.discounts_with_actions == False :
+                    if self.discounts_with_action == False :
                         discount_val = self.models[self.index_discount[i]].predict_proba(user_state)
                         discount_val = discount_val[0][1]
                     else :
