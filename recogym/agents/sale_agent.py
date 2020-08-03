@@ -618,7 +618,7 @@ def build_train_data(logs, feature_provider, reward_provider):
 
 
 class SaleLikelihoodAgent(Agent):
-    def __init__(self, feature_provider, reward_provider, epsilon_greedy = False, epsilon = 0.3, seed=43):
+    def __init__(self, feature_provider, reward_provider, kronecker_features = False, epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider = feature_provider
         self.reward_provider = reward_provider
         self.random_state = RandomState(seed)
@@ -627,6 +627,7 @@ class SaleLikelihoodAgent(Agent):
         self.epsilon = epsilon
         self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
+        self.kronecker_features = kronecker_features
         
     @property
     def num_products(self):
@@ -635,9 +636,16 @@ class SaleLikelihoodAgent(Agent):
     def _create_features(self, user_state, action):
         """Create the features that are used to estimate the expected reward from the user state"""
         features = np.zeros(len(user_state) + self.num_products)
-        # perform kronecker product directly on the flattened version of the features matrix
+        # just put a dummy variable
         features[:len(user_state)] = user_state
         features[int(len(user_state) + action)] = 1
+        return features
+    
+    def _create_features_kronecker(self, user_state, action):
+        """Create the features that are used to estimate the expected reward from the user state"""
+        features = np.zeros(len(user_state) * self.num_products)
+        # perform kronecker product directly on the flattened version of the features matrix
+        features[action*len(user_state):(action+1)*len(user_state)] = user_state
         return features
     
     def train(self, logs):
@@ -651,20 +659,27 @@ class SaleLikelihoodAgent(Agent):
         actions_onehot = np.zeros((len(actions), self.num_products))
         actions_onehot[np.arange(len(actions)),actions] = 1
         
-        
-        features = np.hstack([
-            user_states,
-            actions_onehot
-        ])
+        if self.kronecker_features == False:
+            features = np.hstack([
+                user_states,
+                actions_onehot
+            ])
+        else :
+            features = np.array([self._create_features_kronecker(user_states[i],
+                                                                    actions[i]) 
+                                         for i in range(len(actions))])
         
         self.model = LogisticRegression(solver='lbfgs', max_iter=5000)
-        
         self.model.fit(features, rewards)
         
     
     def _score_products(self, user_state):
-        all_action_features = np.array([self._create_features(user_state,action)
-                                        for action in range(self.num_products)])
+        if self.kronecker_features == False:
+            all_action_features = np.array([self._create_features(user_state,action)
+                                            for action in range(self.num_products)])
+        else :
+            all_action_features = np.array([self._create_features_kronecker(user_state,action)
+                                            for action in range(self.num_products)])
         return self.model.predict_proba(all_action_features)[:, 1]
     
     def observation_to_log(self,observation):
@@ -742,7 +757,8 @@ class SaleLikelihoodAgent(Agent):
 
 
 class SaleProductLikelihoodAgent(Agent):
-    def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, epsilon_greedy = False, epsilon = 0.3, seed=43):
+    def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, 
+                 kronecker_features = False, epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider_list = feature_provider_list
         self.reward_provider_list = reward_provider_list
         self.discounts = np.array(discounts) # list that indicates which model is used to which other model
@@ -750,6 +766,7 @@ class SaleProductLikelihoodAgent(Agent):
         self.random_state = RandomState(seed)
         self.models = [] # each model will correspond to a fitted logistic regression
         self.discounts_with_action = discounts_with_action
+        self.kronecker_features = kronecker_features
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
         # self.cr = []
@@ -770,9 +787,16 @@ class SaleProductLikelihoodAgent(Agent):
     def _create_features(self, user_state, action):
         """Create the features that are used to estimate the expected reward from the user state"""
         features = np.zeros(len(user_state) + self.num_products)
-        # perform kronecker product directly on the flattened version of the features matrix
+        # dummy variables
         features[:len(user_state)] = user_state
         features[int(len(user_state) + action)] = 1
+        return features
+    
+    def _create_features_kronecker(self, user_state, action):
+        """Create the features that are used to estimate the expected reward from the user state"""
+        features = np.zeros(len(user_state) * self.num_products)
+        # perform kronecker product directly on the flattened version of the features matrix
+        features[action*len(user_state):(action+1)*len(user_state)] = user_state
         return features
     
     def train(self, logs):
@@ -798,14 +822,19 @@ class SaleProductLikelihoodAgent(Agent):
             
             # Build features 
             if (self.discounts[i] == 0) or self.discounts_with_action :
-                # Include action               
-                actions_onehot = np.zeros((len(actions), self.num_products))
-                actions_onehot[np.arange(len(actions)),actions] = 1
-                
-                features = np.hstack([
-                    user_states,
-                    actions_onehot
-                ])
+                # Include action         
+                if self.kronecker_features == False:   
+                    actions_onehot = np.zeros((len(actions), self.num_products))
+                    actions_onehot[np.arange(len(actions)),actions] = 1
+                    
+                    features = np.hstack([
+                        user_states,
+                        actions_onehot
+                    ])
+                else :
+                    features = np.array([self._create_features_kronecker(user_states[i],
+                                                                    actions[i]) 
+                                         for i in range(len(actions))])
                 
             else :
                 # Models used as discounts don't use actions
@@ -822,10 +851,14 @@ class SaleProductLikelihoodAgent(Agent):
             self.models.append(model)
     
     def _score_products(self, user_state, model):
-        all_action_features = np.array([
-            self._create_features(user_state, action) for action in range(self.num_products)
-        ])
-        return model.predict_proba(all_action_features)[:, 1]
+        
+        if self.kronecker_features == False:
+            all_action_features = np.array([self._create_features(user_state,action)
+                                            for action in range(self.num_products)])
+        else :
+            all_action_features = np.array([self._create_features_kronecker(user_state,action)
+                                            for action in range(self.num_products)])
+        return self.model.predict_proba(all_action_features)[:, 1]
     
     def observation_to_log(self,observation):
         data = self.logged_observation
