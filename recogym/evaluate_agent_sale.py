@@ -671,16 +671,21 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
         '0.975': [],
     }
     
-    stat_tot_sales = {
+    stat_tot_sales_att = {
         'Agent': [],
-        'TotSales':[]}
+        'TotSalesAtt':[]}
 
-    stat_sale_after_click  = {
+    
+    stat_share_user_sale_att = {
         'Agent': [],
         '0.025': [],
         '0.500': [],
         '0.975': [],
     }
+    
+    stat_tot_sales = {
+        'Agent': [],
+        'TotSales':[]}
     
     stat_share_user_sale = {
         'Agent': [],
@@ -688,72 +693,111 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
         '0.500': [],
         '0.975': [],
     }
+    
+    stat_sale_after_click  = {
+        'Agent': [],
+        '0.025': [],
+        '0.500': [],
+        '0.975': [],
+    }
+        
 
     data_list={}
     embed_list={}
     config_list={}
+    all_data = {}
     
     # One success is defined as at least 1 sale
     for agent_id in agents:
+        # try :
+        envcopy = deepcopy(env)
+        envcopy.reset()
+        if agent_reset == True :
+            agents[agent_id].reset()
+        
+        data = envcopy.generate_logs(number_of_users, agents[agent_id])
         try :
-            envcopy = deepcopy(env)
-            envcopy.reset()
-            if agent_reset == True :
-                agents[agent_id].reset()
+            report_issue = agents[agent_id].report_issue
+        except:
+            report_issue = {}
+        # print("Min dot product",[np.min(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
+        # print("Max dot product",[np.max(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
+        
+        all_data[agent_id]= data
+        data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
+        embed_list[agent_id] = envcopy.user_embedding_list
+        config_list[agent_id] = {"beta":env.beta,"Lambda":envcopy.Lambda,"Gamma":envcopy.Gamma,"psale_scale":envcopy.config.psale_scale}
+        bandits = data[data['z'] == 'bandit']
+        
+
+        # clicks
+        successes_click = np.sum(bandits['c'] > 0)
+        failures_click = bandits[bandits['c'] == 0].shape[0]
+        stat_click['Agent'].append(agent_id)
+        stat_click['0.025'].append(beta.ppf(0.025, successes_click + 1, failures_click + 1))
+        stat_click['0.500'].append(beta.ppf(0.500, successes_click + 1, failures_click + 1))
+        stat_click['0.975'].append(beta.ppf(0.975, successes_click + 1, failures_click + 1))
+        
+        
+        # total number of ATTRIBUTED sales
+        stat_tot_sales_att['Agent'].append(agent_id)
+        stat_tot_sales_att['TotSalesAtt'].append(np.sum(data['r']>0))
+        
+        # share of users who bought something (ATTRIBUTED)
+        stat_share_user_sale_att['Agent'].append(agent_id)
+        grouped_data = data[["r","u"]].groupby("u").sum()["r"]
+        successes_user_sale = sum(grouped_data>0)
+        failures_user_sale = len(data["u"].unique()) - successes_user_sale
+        stat_share_user_sale_att['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
+        stat_share_user_sale_att['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
+        stat_share_user_sale_att['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
+        
+         # total number of sales
+        stat_tot_sales['Agent'].append(agent_id)
+        stat_tot_sales['TotSales'].append(np.sum(data['z']=='sale'))
+        
+        # share of users who bought something
+        stat_share_user_sale['Agent'].append(agent_id)
+        data["sale"] = (data['z']=="sale")*1
+        grouped_data = data[["sale","u"]].groupby("u").sum()["sale"]
+        successes_user_sale = sum(grouped_data>0)
+        failures_user_sale = len(data["u"].unique()) - successes_user_sale
+        stat_share_user_sale['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
+        stat_share_user_sale['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
+        stat_share_user_sale['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
+        
+        
+        # sales rate
+        successes = np.sum(bandits['r'] > 0)
+        failures = bandits[bandits['r'] == 0].shape[0]
+        stat['Agent'].append(agent_id)
+        stat['0.025'].append(beta.ppf(0.025, successes + 1, failures + 1))
+        stat['0.500'].append(beta.ppf(0.500, successes + 1, failures + 1))
+        stat['0.975'].append(beta.ppf(0.975, successes + 1, failures + 1))
+       
+        
+        # share of sales after a click
+        stat_sale_after_click['Agent'].append(agent_id)
+        successes_sale_after_click = len(data[(data["c"]==1) & (data["r"]>0)])
+        failures_sale_after_click = sum(data["c"]==1)-successes_sale_after_click
+        stat_sale_after_click['0.025'].append(beta.ppf(0.025, successes_sale_after_click + 1, failures_sale_after_click + 1))
+        stat_sale_after_click['0.500'].append(beta.ppf(0.500, successes_sale_after_click + 1, failures_sale_after_click + 1))
+        stat_sale_after_click['0.975'].append(beta.ppf(0.975, successes_sale_after_click + 1, failures_sale_after_click + 1))
+        # except :
+        #     print("Issue with agent : ",agent_id)
             
-            data = envcopy.generate_logs(number_of_users, agents[agent_id])
-            data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
-            embed_list[agent_id] = envcopy.user_embedding_list
-            config_list[agent_id] = {"beta":env.beta,"Lambda":envcopy.Lambda,"Gamma":envcopy.Gamma,"psale_scale":envcopy.config.psale_scale}
-            bandits = data[data['z'] == 'bandit']
-            
-            # sales rate
-            successes = np.sum(bandits['r'] > 0)
-            failures = bandits[bandits['r'] == 0].shape[0]
-            stat['Agent'].append(agent_id)
-            stat['0.025'].append(beta.ppf(0.025, successes + 1, failures + 1))
-            stat['0.500'].append(beta.ppf(0.500, successes + 1, failures + 1))
-            stat['0.975'].append(beta.ppf(0.975, successes + 1, failures + 1))
-            
-            # clicks
-            successes_click = np.sum(bandits['c'] > 0)
-            failures_click = bandits[bandits['c'] == 0].shape[0]
-            stat_click['Agent'].append(agent_id)
-            stat_click['0.025'].append(beta.ppf(0.025, successes_click + 1, failures_click + 1))
-            stat_click['0.500'].append(beta.ppf(0.500, successes_click + 1, failures_click + 1))
-            stat_click['0.975'].append(beta.ppf(0.975, successes_click + 1, failures_click + 1))
-            
-             # total number of sales
-            stat_tot_sales['Agent'].append(agent_id)
-            stat_tot_sales['TotSales'].append(np.sum(data['r']>0))
-            
-            # share of users who bought something
-            stat_share_user_sale['Agent'].append(agent_id)
-            grouped_data = data[["r","u"]].groupby("u").sum()["r"]
-            successes_user_sale = sum(grouped_data>0)
-            failures_user_sale = len(data["u"].unique()) - successes_user_sale
-            stat_share_user_sale['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
-            stat_share_user_sale['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
-            stat_share_user_sale['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
-            
-            # share of sales after a click
-            stat_sale_after_click['Agent'].append(agent_id)
-            successes_sale_after_click = len(data[(data["c"]==1) & (data["r"]>0)])
-            failures_sale_after_click = sum(data["c"]==1)-successes_sale_after_click
-            stat_sale_after_click['0.025'].append(beta.ppf(0.025, successes_sale_after_click + 1, failures_sale_after_click + 1))
-            stat_sale_after_click['0.500'].append(beta.ppf(0.500, successes_sale_after_click + 1, failures_sale_after_click + 1))
-            stat_sale_after_click['0.975'].append(beta.ppf(0.975, successes_sale_after_click + 1, failures_sale_after_click + 1))
-        except :
-            print("Issue with agent : ",agent_id)
-            
-    return {'sale rate': pd.DataFrame().from_dict(stat), 
-            'CTR': pd.DataFrame().from_dict(stat_click), 
+    return {'CTR': pd.DataFrame().from_dict(stat_click), 
+            'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
+            'Share user with sale ATT': pd.DataFrame().from_dict(stat_share_user_sale_att), 
             'Tot sales': pd.DataFrame().from_dict(stat_tot_sales),
             'Share user with sale': pd.DataFrame().from_dict(stat_share_user_sale), 
+            'sale rate': pd.DataFrame().from_dict(stat), 
             'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
             'User embeddings':embed_list,
             'reco':data_list,
-            'config_list':config_list}
+            'config_list':config_list,
+            'all_data':all_data,
+            'report_issue':report_issue}
 
 
 
@@ -971,20 +1015,12 @@ def verify_agents_recall_at_k_sale(reco_log, agents, k=5):
     return pd.DataFrame().from_dict(stat), pd.DataFrame().from_dict(stat_click)
 
 
-def plot_verify_agents_sale(result_sales, result_clicks, result_tot_sales, result_share_user_sale, result_sale_after_click, user_embedding):
-    # Sales rates
-    fig, ax = plt.subplots()
-    ax.set_title('Sales Estimate for Different Agents')
-    plt.errorbar(result_sales['Agent'],
-                 result_sales['0.500'],
-                 yerr=(result_sales['0.500'] - result_sales['0.025'],
-                       result_sales['0.975'] - result_sales['0.500']),
-                 fmt='o',
-                 capsize=4)
-    plt.xticks(result_sales['Agent'], result_sales['Agent'], rotation='vertical')
+def plot_verify_agents_sale(result_clicks, result_tot_sales_att, result_share_user_sale_att,
+                            result_tot_sales, result_share_user_sale):
+
     
     # CTR
-    fig2, ax = plt.subplots()
+    fig1, ax = plt.subplots()
     ax.set_title('CTR Estimate for Different Agents')
     plt.errorbar(result_clicks['Agent'],
                  result_clicks['0.500'],
@@ -994,15 +1030,49 @@ def plot_verify_agents_sale(result_sales, result_clicks, result_tot_sales, resul
                  capsize=4)
     plt.xticks(result_clicks['Agent'], result_clicks['Agent'], rotation='vertical')
     
+    
+     # Total sales ATT
+    fig5, ax = plt.subplots()
+    ax.set_title('Total sales for Different Agents ATT')
+    plt.scatter(result_tot_sales_att['Agent'],
+                 result_tot_sales_att['TotSalesAtt'])
+    plt.xticks(result_tot_sales_att['Agent'], result_tot_sales_att['Agent'], rotation='vertical')
+    
+    # Share of users with sale ATT
+    fig6, ax = plt.subplots()
+    ax.set_title('Share of users with sales for Different Agents ATT')
+    plt.errorbar(result_share_user_sale_att['Agent'],
+                 result_share_user_sale_att['0.500'],
+                 yerr=(result_share_user_sale_att['0.500'] - result_share_user_sale_att['0.025'],
+                       result_share_user_sale_att['0.975'] - result_share_user_sale_att['0.500']),
+                 fmt='o',
+                 capsize=4)
+    plt.xticks(result_share_user_sale_att['Agent'], result_share_user_sale_att['Agent'], rotation='vertical')
+    
+    
+    # Share of clicks with sales ATT
+    fig7, ax = plt.subplots()
+    ax.set_title('CR as a function of CTR ATT')
+    for i in range(len(result_clicks['0.500'])):
+        plt.errorbar(result_clicks.iloc[i]['0.500'],
+                     result_share_user_sale_att.iloc[i]['0.500'],
+                     xerr=result_clicks.iloc[i]['0.500'] - result_clicks.iloc[i]['0.025'],
+                     yerr=result_share_user_sale_att.iloc[i]['0.500'] - result_share_user_sale_att.iloc[i]['0.025'],
+                     fmt='o',
+                     capsize=4, 
+                     label = result_clicks.iloc[i]["Agent"])
+    ax.legend()
+    
+    
     # Total sales
-    fig3, ax = plt.subplots()
+    fig2, ax = plt.subplots()
     ax.set_title('Total sales for Different Agents')
     plt.scatter(result_tot_sales['Agent'],
                  result_tot_sales['TotSales'])
     plt.xticks(result_tot_sales['Agent'], result_tot_sales['Agent'], rotation='vertical')
     
     # Share of users with sale
-    fig4, ax = plt.subplots()
+    fig3, ax = plt.subplots()
     ax.set_title('Share of users with sales for Different Agents')
     plt.errorbar(result_share_user_sale['Agent'],
                  result_share_user_sale['0.500'],
@@ -1012,20 +1082,9 @@ def plot_verify_agents_sale(result_sales, result_clicks, result_tot_sales, resul
                  capsize=4)
     plt.xticks(result_share_user_sale['Agent'], result_share_user_sale['Agent'], rotation='vertical')
     
-    # Share of clicks with sales
-    fig5, ax = plt.subplots()
-    ax.set_title('Share of clicks with sales for Different Agents')
-    plt.errorbar(result_sale_after_click['Agent'],
-                 result_sale_after_click['0.500'],
-                 yerr=(result_sale_after_click['0.500'] - result_sale_after_click['0.025'],
-                       result_sale_after_click['0.975'] - result_sale_after_click['0.500']),
-                 fmt='o',
-                 capsize=4)
-    plt.xticks(result_sale_after_click['Agent'], result_sale_after_click['Agent'], rotation='vertical')
-    
     
     # Share of clicks with sales
-    fig6, ax = plt.subplots()
+    fig4, ax = plt.subplots()
     ax.set_title('CR as a function of CTR')
     for i in range(len(result_clicks['0.500'])):
         plt.errorbar(result_clicks.iloc[i]['0.500'],
@@ -1037,7 +1096,7 @@ def plot_verify_agents_sale(result_sales, result_clicks, result_tot_sales, resul
                      label = result_clicks.iloc[i]["Agent"])
     ax.legend()
     
-    return fig, fig2, fig3, fig4, fig5, fig6
+    return fig1, fig5, fig6, fig7, fig2, fig3, fig4
 
 
 

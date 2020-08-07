@@ -50,12 +50,16 @@ env_1_sale_args = {
     **env_1_args,
     **{
         'kappa': 0.2, # post-click scaling of theuser embedding update 
+        # 'kappa':0.3,
         'sigma_Lambda' : 1,
         # 'user_propensity' : {'a':2, 'b':6}, # propensity of buying of users, drawn from a beta distribution
         'psale_scale' : 0.15, # scaling coefficient for the probability of drawing a sale
+        # 'psale_scale' : 0.1, # scaling coefficient for the probability of drawing a sale
         'delta_for_clicks' : 0,
         'delta_for_views' : 0,
-        'sig_coef':1
+        'sig_coef':1,
+        'mu_sale':True,
+        'sigma_mu_sale':0
     }
 }
 
@@ -87,6 +91,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.user_ps_list=[] ##H
         self.user_embedding_list = []
         self.action_list = []
+        self.list_dot_products = [] #toremove
 
     def generate_organic_sessions(self, initial_product = None):
         
@@ -187,6 +192,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             self.first_step = False
             sessions, sales = self.generate_organic_sessions() ##H
             self.user_embedding_list.append({"init":self.omega})
+            self.list_dot_products.append([]) #toremove
             return (
                 Observation(
                     DefaultContext(
@@ -220,6 +226,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # Markov state dependent logic.
         if self.state == organic:
             sessions, reward = self.generate_organic_sessions(initial_product) ##H
+            # only attribute rewards that are post-click
+            reward = reward*(click==1)
         else:
             sessions = self.empty_sessions
             reward = 0
@@ -415,8 +423,20 @@ class RecoEnv1Sale(AbstractEnv): ##H
             scale = self.config.sigma_Lambda,
             size=(self.config.num_products, self.config.K)
         )
-        # self.Lambda = np.abs(self.Lambda)
+        self.Lambda = np.abs(self.Lambda)
         
+        # Add product popularity with mean of the organic popularity
+        if self.config.mu_sale == True:
+            shift_mu_sale_organic = 2*np.abs(np.median(self.mu_organic))
+            print(shift_mu_sale_organic)
+            self.mu_sale = self.rng.normal(
+                self.mu_organic[:,0]-shift_mu_sale_organic, self.config.sigma_mu_sale,
+                size=self.config.num_products
+            )
+        else:
+            self.mu_sale = np.zeros(self.config.num_products)
+    
+        print("mu sale",self.mu_sale)
 
     # Create a new user.
     def reset(self, user_id=0):
@@ -538,7 +558,12 @@ class RecoEnv1Sale(AbstractEnv): ##H
     def draw_sale(self, a, coef=1):
         ''' Draw sale following a Bernoulli'''
         # compute the sigmoid over the embeddings dot product
-        p_sale = flatsig(self.Lambda[int(a),:] @ (self.delta), coef=coef)[0]
+        
+        try:
+            self.list_dot_products[len(self.list_dot_products)-1].append(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a])
+        except:
+            self.list_dot_products.append([self.Lambda[int(a),:] @ self.delta]+ self.mu_sale[a])
+        p_sale = flatsig(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a], coef=coef)[0]
         self.proba_sales[self.current_user_id].append(p_sale)
         
         # add the user propensity to buy (personnalized or generic)
