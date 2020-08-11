@@ -22,13 +22,13 @@ from .envs.context import DefaultContext
 from .envs.observation import Observation
 from .envs.session import OrganicSessions
 from recogym.envs.reco_env_v1_sale import ff, sig
-
 from recogym.evaluate_agent import (EpsilonDelta, EpsilonSteps, EpsilonPrecision, EvolutionEpsilons,
                                     GraphCTRMin,GraphCTRMax,
                                     to_categorical,build_agent_init, 
                                     gather_agent_stats, build_agents, generate_epsilons, format_epsilon,
                                     )
-
+import pickle as pkl
+from datetime import datetime
 
 
 GraphSalesMin = 0.009
@@ -709,82 +709,95 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
     
     # One success is defined as at least 1 sale
     for agent_id in agents:
-        # try :
-        envcopy = deepcopy(env)
-        envcopy.reset()
-        if agent_reset == True :
-            agents[agent_id].reset()
-        
-        data = envcopy.generate_logs(number_of_users, agents[agent_id])
         try :
-            report_issue = agents[agent_id].report_issue
-        except:
-            report_issue = {}
-        # print("Min dot product",[np.min(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
-        # print("Max dot product",[np.max(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
-        
-        all_data[agent_id]= data
-        data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
-        embed_list[agent_id] = envcopy.user_embedding_list
-        config_list[agent_id] = {"beta":env.beta,"Lambda":envcopy.Lambda,"Gamma":envcopy.Gamma,"psale_scale":envcopy.config.psale_scale}
-        bandits = data[data['z'] == 'bandit']
-        
-
-        # clicks
-        successes_click = np.sum(bandits['c'] > 0)
-        failures_click = bandits[bandits['c'] == 0].shape[0]
-        stat_click['Agent'].append(agent_id)
-        stat_click['0.025'].append(beta.ppf(0.025, successes_click + 1, failures_click + 1))
-        stat_click['0.500'].append(beta.ppf(0.500, successes_click + 1, failures_click + 1))
-        stat_click['0.975'].append(beta.ppf(0.975, successes_click + 1, failures_click + 1))
-        
-        
-        # total number of ATTRIBUTED sales
-        stat_tot_sales_att['Agent'].append(agent_id)
-        stat_tot_sales_att['TotSalesAtt'].append(np.sum(data['r']>0))
-        
-        # share of users who bought something (ATTRIBUTED)
-        stat_share_user_sale_att['Agent'].append(agent_id)
-        grouped_data = data[["r","u"]].groupby("u").sum()["r"]
-        successes_user_sale = sum(grouped_data>0)
-        failures_user_sale = len(data["u"].unique()) - successes_user_sale
-        stat_share_user_sale_att['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
-        stat_share_user_sale_att['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
-        stat_share_user_sale_att['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
-        
-         # total number of sales
-        stat_tot_sales['Agent'].append(agent_id)
-        stat_tot_sales['TotSales'].append(np.sum(data['z']=='sale'))
-        
-        # share of users who bought something
-        stat_share_user_sale['Agent'].append(agent_id)
-        data["sale"] = (data['z']=="sale")*1
-        grouped_data = data[["sale","u"]].groupby("u").sum()["sale"]
-        successes_user_sale = sum(grouped_data>0)
-        failures_user_sale = len(data["u"].unique()) - successes_user_sale
-        stat_share_user_sale['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
-        stat_share_user_sale['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
-        stat_share_user_sale['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
-        
-        
-        # sales rate
-        successes = np.sum(bandits['r'] > 0)
-        failures = bandits[bandits['r'] == 0].shape[0]
-        stat['Agent'].append(agent_id)
-        stat['0.025'].append(beta.ppf(0.025, successes + 1, failures + 1))
-        stat['0.500'].append(beta.ppf(0.500, successes + 1, failures + 1))
-        stat['0.975'].append(beta.ppf(0.975, successes + 1, failures + 1))
-       
-        
-        # share of sales after a click
-        stat_sale_after_click['Agent'].append(agent_id)
-        successes_sale_after_click = len(data[(data["c"]==1) & (data["r"]>0)])
-        failures_sale_after_click = sum(data["c"]==1)-successes_sale_after_click
-        stat_sale_after_click['0.025'].append(beta.ppf(0.025, successes_sale_after_click + 1, failures_sale_after_click + 1))
-        stat_sale_after_click['0.500'].append(beta.ppf(0.500, successes_sale_after_click + 1, failures_sale_after_click + 1))
-        stat_sale_after_click['0.975'].append(beta.ppf(0.975, successes_sale_after_click + 1, failures_sale_after_click + 1))
-        # except :
-        #     print("Issue with agent : ",agent_id)
+            envcopy = deepcopy(env)
+            envcopy.reset()
+            if agent_reset == True :
+                agents[agent_id].reset()
+            
+            data = envcopy.generate_logs(number_of_users, agents[agent_id])
+            try :
+                report_issue = agents[agent_id].report_issue
+            except:
+                report_issue = {}
+            # print("Min dot product",[np.min(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
+            # print("Max dot product",[np.max(envcopy.list_dot_products[i]) for i in range(len(envcopy.list_dot_products))])
+            
+            all_data[agent_id]= data
+            data_list[agent_id] = data.loc[data["a"] >= 0].loc[data["c"] > 0]
+            embed_list[agent_id] = envcopy.user_embedding_list
+            config_list[agent_id] = {"beta":env.beta,"Lambda":envcopy.Lambda,"Gamma":envcopy.Gamma,"psale_scale":envcopy.config.psale_scale}
+            bandits = data[data['z'] == 'bandit']
+            
+    
+            # clicks
+            successes_click = np.sum(bandits['c'] > 0)
+            failures_click = bandits[bandits['c'] == 0].shape[0]
+            stat_click['Agent'].append(agent_id)
+            stat_click['0.025'].append(beta.ppf(0.025, successes_click + 1, failures_click + 1))
+            stat_click['0.500'].append(beta.ppf(0.500, successes_click + 1, failures_click + 1))
+            stat_click['0.975'].append(beta.ppf(0.975, successes_click + 1, failures_click + 1))
+            
+            
+            # total number of ATTRIBUTED sales
+            stat_tot_sales_att['Agent'].append(agent_id)
+            stat_tot_sales_att['TotSalesAtt'].append(np.sum(data['r']>0))
+            
+            # share of users who bought something (ATTRIBUTED)
+            stat_share_user_sale_att['Agent'].append(agent_id)
+            grouped_data = data[["r","u"]].groupby("u").sum()["r"]
+            successes_user_sale = sum(grouped_data>0)
+            failures_user_sale = len(data["u"].unique()) - successes_user_sale
+            stat_share_user_sale_att['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
+            stat_share_user_sale_att['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
+            stat_share_user_sale_att['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
+            
+             # total number of sales
+            stat_tot_sales['Agent'].append(agent_id)
+            stat_tot_sales['TotSales'].append(np.sum(data['z']=='sale'))
+            
+            # share of users who bought something
+            stat_share_user_sale['Agent'].append(agent_id)
+            data["sale"] = (data['z']=="sale")*1
+            grouped_data = data[["sale","u"]].groupby("u").sum()["sale"]
+            successes_user_sale = sum(grouped_data>0)
+            failures_user_sale = len(data["u"].unique()) - successes_user_sale
+            stat_share_user_sale['0.025'].append(beta.ppf(0.025, successes_user_sale + 1, failures_user_sale + 1))
+            stat_share_user_sale['0.500'].append(beta.ppf(0.500, successes_user_sale + 1, failures_user_sale + 1))
+            stat_share_user_sale['0.975'].append(beta.ppf(0.975, successes_user_sale + 1, failures_user_sale + 1))
+            
+            
+            # sales rate
+            successes = np.sum(bandits['r'] > 0)
+            failures = bandits[bandits['r'] == 0].shape[0]
+            stat['Agent'].append(agent_id)
+            stat['0.025'].append(beta.ppf(0.025, successes + 1, failures + 1))
+            stat['0.500'].append(beta.ppf(0.500, successes + 1, failures + 1))
+            stat['0.975'].append(beta.ppf(0.975, successes + 1, failures + 1))
+           
+            
+            # share of sales after a click
+            stat_sale_after_click['Agent'].append(agent_id)
+            successes_sale_after_click = len(data[(data["c"]==1) & (data["r"]>0)])
+            failures_sale_after_click = sum(data["c"]==1)-successes_sale_after_click
+            stat_sale_after_click['0.025'].append(beta.ppf(0.025, successes_sale_after_click + 1, failures_sale_after_click + 1))
+            stat_sale_after_click['0.500'].append(beta.ppf(0.500, successes_sale_after_click + 1, failures_sale_after_click + 1))
+            stat_sale_after_click['0.975'].append(beta.ppf(0.975, successes_sale_after_click + 1, failures_sale_after_click + 1))
+        except :
+            print("Issue with agent : ",agent_id)
+            dico = {'CTR': pd.DataFrame().from_dict(stat_click), 
+            'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
+            'Share user with sale ATT': pd.DataFrame().from_dict(stat_share_user_sale_att), 
+            'Tot sales': pd.DataFrame().from_dict(stat_tot_sales),
+            'Share user with sale': pd.DataFrame().from_dict(stat_share_user_sale), 
+            'sale rate': pd.DataFrame().from_dict(stat), 
+            'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
+            'User embeddings':embed_list,
+            'reco':data_list,
+            'config_list':config_list,
+            'all_data':all_data,
+            'report_issue':report_issue}
+            pkl.dump(dico, open('data/res_before_crash'+str(int(datetime.timestamp(datetime.now())))+'.pkl',"wb"))
             
     return {'CTR': pd.DataFrame().from_dict(stat_click), 
             'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
