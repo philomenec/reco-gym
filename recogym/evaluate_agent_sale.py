@@ -656,7 +656,7 @@ def plot_roi(
     return agent_roi_stats
 
 
-def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
+def verify_agents_sale(env, number_of_users, agents, agent_reset = False, name = ''): ##H
     stat = {
         'Agent': [],
         '0.025': [],
@@ -783,8 +783,27 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
             stat_sale_after_click['0.025'].append(beta.ppf(0.025, successes_sale_after_click + 1, failures_sale_after_click + 1))
             stat_sale_after_click['0.500'].append(beta.ppf(0.500, successes_sale_after_click + 1, failures_sale_after_click + 1))
             stat_sale_after_click['0.975'].append(beta.ppf(0.975, successes_sale_after_click + 1, failures_sale_after_click + 1))
-        except :
+            
+            # save intermediate result
+            agent_dico = {'CTR': pd.DataFrame().from_dict(stat_click), 
+                            'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
+                            'Share user with sale ATT': pd.DataFrame().from_dict(stat_share_user_sale_att), 
+                            'Tot sales': pd.DataFrame().from_dict(stat_tot_sales),
+                            'Share user with sale': pd.DataFrame().from_dict(stat_share_user_sale), 
+                            'sale rate': pd.DataFrame().from_dict(stat), 
+                            'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
+                            # only save info of the current agent to save space
+                            'User embeddings':embed_list[agent_id],
+                            'reco':data_list[agent_id],
+                            'config_list':config_list[agent_id],
+                            'all_data':all_data[agent_id],
+                            'report_issue':report_issue}
+            pkl.dump(agent_dico, open('data/res_'+name+agent_id+'.pkl',"wb"))
+            
+            
+        except Exception as e:
             print("Issue with agent : ",agent_id)
+            print('exception:',e)
             dico = {'CTR': pd.DataFrame().from_dict(stat_click), 
             'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
             'Share user with sale ATT': pd.DataFrame().from_dict(stat_share_user_sale_att), 
@@ -797,7 +816,7 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False): ##H
             'config_list':config_list,
             'all_data':all_data,
             'report_issue':report_issue}
-            pkl.dump(dico, open('data/res_before_crash'+str(int(datetime.timestamp(datetime.now())))+'.pkl',"wb"))
+            pkl.dump(dico, open('data/res_before_crash'+name+str(int(datetime.timestamp(datetime.now())))+'.pkl',"wb"))
             
     return {'CTR': pd.DataFrame().from_dict(stat_click), 
             'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
