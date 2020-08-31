@@ -793,8 +793,8 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False, name =
                             'sale rate': pd.DataFrame().from_dict(stat), 
                             'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
                             # only save info of the current agent to save space
-                            'User embeddings':embed_list[agent_id],
-                            'reco':data_list[agent_id],
+                            # 'User embeddings':embed_list[agent_id],
+                            # 'reco':data_list[agent_id],
                             'config_list':config_list[agent_id],
                             'all_data':all_data[agent_id],
                             'report_issue':report_issue}
@@ -811,8 +811,8 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False, name =
             'Share user with sale': pd.DataFrame().from_dict(stat_share_user_sale), 
             'sale rate': pd.DataFrame().from_dict(stat), 
             'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
-            'User embeddings':embed_list,
-            'reco':data_list,
+            # 'User embeddings':embed_list,
+            # 'reco':data_list,
             'config_list':config_list,
             'all_data':all_data,
             'report_issue':report_issue}
@@ -825,8 +825,8 @@ def verify_agents_sale(env, number_of_users, agents, agent_reset = False, name =
             'Share user with sale': pd.DataFrame().from_dict(stat_share_user_sale), 
             'sale rate': pd.DataFrame().from_dict(stat), 
             'Share sale after click': pd.DataFrame().from_dict(stat_sale_after_click),
-            'User embeddings':embed_list,
-            'reco':data_list,
+            # 'User embeddings':embed_list,
+            # 'reco':data_list,
             'config_list':config_list,
             'all_data':all_data,
             'report_issue':report_issue}
