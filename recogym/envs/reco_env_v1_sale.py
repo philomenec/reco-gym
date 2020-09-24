@@ -87,7 +87,10 @@ class RecoEnv1Sale(AbstractEnv): ##H
         super(RecoEnv1Sale, self).__init__() ##H
         self.cached_state_seed = None
         self.proba_sales={} ##H
-        self.proba_sales_after_scaling={} ##H
+        self.ctr={}
+        self.current_ctr = None
+        self.current_proba_sales = None
+        self.organic_proba_sales = None
         self.user_ps_list=[] ##H
         self.user_embedding_list = []
         self.action_list = []
@@ -386,8 +389,119 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         return pd.DataFrame().from_dict(data)
     
+    
+    
+    def generate_logs_trueprobas(
+            self,
+            num_offline_users: int,
+            agent: Agent = None,
+            num_organic_offline_users: int = 0
+    ):
+        """
+        Produce logs of applying an Agent in the Environment for the specified amount of Users.
+        If the Agent is not provided, then the default Agent is used that randomly selects an Action.
+        """
 
+        if agent:
+            old_agent = self.agent
+            self.agent = agent
 
+        data = {
+            't': [],
+            'u': [],
+            'z': [],
+            'v': [],
+            'a': [],
+            'c': [],
+            'r': [],
+            'ps': [],
+            'ps-a': [],
+        }
+        
+        data_true = {
+            'u':[],
+            'a': [],
+            'ctr':[],
+            'pcs':[],
+            'ncs':[],
+            'os':[]
+        }
+
+        def _store_organic(observation):
+            assert (observation is not None)
+            assert (observation.sessions() is not None)
+            for session in observation.sessions():
+                data['t'].append(session['t'])
+                data['u'].append(session['u'])
+                ##H before: just appending organic ##++ keep organic ?
+                data['z'].append('organic' if session['z']=='pageview' else 'sale') 
+                data['v'].append(session['v'])
+                data['a'].append(None)
+                data['c'].append(None)
+                data['r'].append(None) ##H
+                data['ps'].append(None)
+                data['ps-a'].append(None)
+
+        def _store_bandit(action, reward, observation):
+            if action:
+                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
+                assert (reward is not None)
+                data['t'].append(action['t'])
+                data['u'].append(action['u'])
+                data['z'].append('bandit')
+                data['v'].append(None)
+                data['a'].append(action['a'])
+                data['c'].append(click) ##H
+                data['r'].append(reward)
+                data['ps'].append(action['ps'])
+                data['ps-a'].append(action['ps-a'] if 'ps-a' in action else ())
+
+        unique_user_id = 0
+        for _ in trange(num_organic_offline_users, desc='Organic Users'):
+            self.reset(unique_user_id)
+            unique_user_id += 1
+            observation, _, _, _ = self.step(None)
+            _store_organic(observation)
+
+        for _ in trange(num_offline_users, desc='Users'):
+            self.reset(unique_user_id)
+            unique_user_id += 1
+            observation, reward, done, info = self.step(None)
+
+            while not done:
+                _store_organic(observation)
+                action, observation, reward, done, info = self.step_offline(
+                    observation, reward, done, info
+                )
+                _store_bandit(action, reward, observation)
+                
+                # save true probas
+                data_true['u'].append(unique_user_id)
+                data_true['a'].append(action)
+                data_true['ctr'].append(self.current_ctr)
+                data_true['pcs'].append(self.current_proba_sales)
+                data_true['ncs'].append(self.last_proba_sales)
+                data_true['os'].append(self.organic_proba_sales)
+                
+                
+            _store_organic(observation)
+            action, _, reward, done, info = self.step_offline(
+                observation, reward, done, info
+            )
+            assert done, 'Done must not be changed!'
+            _store_bandit(action, reward, observation)
+
+        data['t'] = np.array(data['t'], dtype=np.float32)
+        data['u'] = pd.array(data['u'], dtype=pd.UInt16Dtype())
+        data['v'] = pd.array(data['v'], dtype=pd.UInt16Dtype())
+        data['a'] = pd.array(data['a'], dtype=pd.UInt16Dtype())
+        data['c'] = np.array(data['c'], dtype=np.float32)
+
+        if agent:
+            self.agent = old_agent
+
+        return pd.DataFrame().from_dict(data), pd.DataFrame().from_dict(data_true)
+    
 
     def set_static_params(self):
         # Initialise the state transition matrix which is 3 by 3
@@ -428,7 +542,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # Add product popularity with mean of the organic popularity
         if self.config.mu_sale == True:
             shift_mu_sale_organic = 2*np.abs(np.median(self.mu_organic))
-            print(shift_mu_sale_organic)
+            # print(shift_mu_sale_organic)
             self.mu_sale = self.rng.normal(
                 self.mu_organic[:,0]-shift_mu_sale_organic, self.config.sigma_mu_sale,
                 size=self.config.num_products
@@ -436,7 +550,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         else:
             self.mu_sale = np.zeros(self.config.num_products)
     
-        print("mu sale",self.mu_sale)
+        # print("mu sale",self.mu_sale)
 
     # Create a new user.
     def reset(self, user_id=0):
@@ -446,15 +560,15 @@ class RecoEnv1Sale(AbstractEnv): ##H
             0, self.config.sigma_omega_initial, size=(self.config.K, 1)
         )
         self.delta = self.omega #initialize additional term for user feature update
-        self.proba_sales[self.current_user_id] = [] ##H
-        self.proba_sales_after_scaling[self.current_user_id] = [] #HH
-        # self.current_user_ps = self.rng.beta(
-        #     a=self.config.user_propensity['a'], 
-        #     b=self.config.user_propensity['b']
-        # )
+        self.proba_sales[self.current_user_id] = [] 
+        self.ctr[self.current_user_id] = [] 
+        self.current_ctr = None
         self.current_user_ps = self.config.psale_scale
+        self.current_proba_sales = None
+        self.last_proba_sales = self.organic_proba_sales
         self.user_ps_list.append(self.current_user_ps)
         self.clicks = []
+        
 
     # Update user state to one of (organic, bandit, leave) and their omega (latent factor).
     def update_state(self):
@@ -489,6 +603,18 @@ class RecoEnv1Sale(AbstractEnv): ##H
             ).ravel()
         assert self.cached_state_seed is not None
         ctr = ff(self.cached_state_seed)
+        self.ctr[self.current_user_id].append(ctr[recommendation])
+        
+        # save current true probas 
+        a = recommendation
+        self.current_ctr = ctr[a]
+        
+        coef = self.config.sig_coef if not None else 1
+        self.organic_proba_sales = self.current_user_ps * flatsig(self.Lambda[int(a),:] @ self.omega + self.mu_sale[a], coef=coef)[0]
+        self.last_proba_sales = self.current_user_ps * flatsig(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a], coef=coef)[0]
+        new_delta = (1-self.config.kappa)*self.delta + self.config.kappa*np.expand_dims(self.Lambda[int(a),:], axis=1)
+        self.current_proba_sales = self.current_user_ps * flatsig(self.Lambda[int(a),:] @ new_delta + self.mu_sale[a], coef=coef)[0]
+        
         click = self.rng.choice(
             [0, 1],
             p=[1 - ctr[recommendation], ctr[recommendation]]
@@ -564,11 +690,10 @@ class RecoEnv1Sale(AbstractEnv): ##H
         except:
             self.list_dot_products.append([self.Lambda[int(a),:] @ self.delta]+ self.mu_sale[a])
         p_sale = flatsig(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a], coef=coef)[0]
-        self.proba_sales[self.current_user_id].append(p_sale)
         
         # add the user propensity to buy (personnalized or generic)
         p_sale = self.current_user_ps * p_sale
-        self.proba_sales_after_scaling[self.current_user_id].append(p_sale)
+        self.proba_sales[self.current_user_id].append(p_sale)
         
         sale = self.rng.choice(
             [0, 1],

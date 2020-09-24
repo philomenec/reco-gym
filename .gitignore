@@ -1,7 +1,9 @@
+*.pkl*
 *.txt
 *Copy*
 *Copie*
-
+*3_Other_*
+*3_train_*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

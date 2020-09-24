@@ -13,7 +13,8 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from recogym.util import FullBatchLBFGS
-
+import pandas as pd
+from IPython.display import display
 
 P = 10  # Number of Products
 U = 2000 # Number of Users
@@ -621,4 +622,201 @@ def expected_sale_given_action_click(env, action, user_update = True):
 
 
 
+def avg_result(res_dict):
+    std = {}
+    for f in list(res_dict.keys()):
+        r= deepcopy(res_dict[f])
+        agents = list(r['CTR']['Agent'])
+        if f == list(res_dict.keys())[0]:
+            res_avg = deepcopy(r)
+        std[f] = {f:{}}
+        for m in list(res_avg.keys())[:5]:
+            res_avg[m]['Agent'] = agents
+            res_avg[m]['Mean'] = 0
+            res_avg[m]['std'] = 0
+            res_avg[m]['se'] = 0
+            std[m] = []
+    for nb in list(res_dict.keys()):
+        r= deepcopy(res_dict)
+        for m in list(res_avg.keys())[:5]:
+            if m in ['CTR','Share user with sale ATT', 'Share user with sale']:
+                mean = r[nb][m]['0.500'].loc[[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            elif m in ['Tot sales ATT']:
+                mean = r[nb][m]['TotSalesAtt'][[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            else:
+                mean = r[nb][m]['TotSales'][[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            mean = list(mean)
+            res_avg[m]['Mean'] += mean
+            std[m] += [mean]
+            
+    for nb in list(res_dict.keys()):
+        for m in list(res_avg.keys())[:5]:
+            res_avg[m]['Mean'] = res_avg[m]['Mean']/len(r)
+            try:
+                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][2]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][3]) for i in range(len(r))])]
+            except:
+                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][2]) for i in range(len(r))])]
+            res_avg[m]['se'] = res_avg[m]['std']/np.sqrt(len(r))
+    return res_avg
 
+
+
+
+def format_avg_result(res_avg):
+    res_recap = pd.DataFrame(res_avg['CTR']['Agent'])
+    res = deepcopy(res_avg)
+    for m in list(res.keys())[:5]:
+        if m in ['CTR']:
+            res[m]['Mean'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]['std'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["std"]], index = res[m].index)
+            res[m]['se'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+') %'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+') %'
+        elif m in ['Share user with sale ATT','Share user with sale']:
+            res[m]["Mean"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]["std"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["std"]], index = res[m].index)
+            res[m]["se"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+') %'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+') %'
+        else :
+            res[m]["Mean"] = pd.Series([str(int(val)) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]["std"] = pd.Series([str(int(val)) for val in res[m]["std"]], index = res[m].index)
+            res[m]["se"] = pd.Series([str(int(val)) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+')'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
+        res_recap[m] =  res[m]['res_se']
+    if len(res_recap) == 4:
+        res_recap['Agent'] = ['Click','PDS','PCS','DPCS']
+    elif len(res_recap) == 3:
+        res_recap['Agent'] = ['Click','PCS','DPCS']
+    res_recap.columns = ['Agent','CTR','Att Sales','Att CR','Sales','CR']
+    display(res_recap)
+    # print(res_recap.to_latex(index = False))
+    return res_recap, res_recap.to_latex(index = False)  
+
+
+def avg_result_extended(res_dict):
+    std = {}
+    for f in list(res_dict.keys()):
+        r= deepcopy(res_dict[f])
+        agents = list(r['CTR']['Agent'])
+        if f == list(res_dict.keys())[0]:
+            res_avg = deepcopy(r)
+        std[f] = {f:{}}
+        for m in list(res_avg.keys())[:9]:
+            res_avg[m]['Agent'] = agents
+            res_avg[m]['Mean'] = 0
+            res_avg[m]['std'] = -1
+            res_avg[m]['se'] = -1
+            std[m] = []
+        for m in ['NDPC','DPCSO','DPCSN']:
+            res_avg[m] = deepcopy(res_avg['CTR'])
+            std[m] = []
+            
+    for nb in list(res_dict.keys()):
+        r= deepcopy(res_dict)
+        for m in list(res_avg.keys())[:9]:
+            if m in ['CTR','Share user with sale ATT', 'Share user with sale']:
+                mean = r[nb][m]['0.500'].loc[[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            elif m in ['Tot sales ATT']:
+                mean = r[nb][m]['TotSalesAtt'][[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            elif m in ['Tot sales']:
+                mean = r[nb][m]['TotSales'][[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            else:
+                mean = r[nb][m]['Mean'][[agent in agents for agent in list(r[nb][m]["Agent"])]]
+            mean = list(mean)
+            res_avg[m]['Mean'] += mean
+            std[m] += [mean]
+        for m in ['NDPC','DPCSO','DPCSN']:
+            mean_ctr = np.array(r[nb]['True CTR']['Mean'][[agent in agents for agent in list(r[nb]['CTR']["Agent"])]])
+            mean_pcs = np.array(r[nb]['True PCS']['Mean'][[agent in agents for agent in list(r[nb]['CTR']["Agent"])]])
+            if m =='NDPC':
+                mean = mean_ctr*mean_pcs
+                
+            elif m == 'DPCSO':
+                mean_os = np.array(r[nb]['True OS']['Mean'][[agent in agents for agent in list(r[nb]['CTR']["Agent"])]])
+                mean = mean_ctr*(mean_pcs-mean_os)
+                
+            elif m == 'DPCSN':
+                mean_ncs = np.array(r[nb]['True NCS']['Mean'][[agent in agents for agent in list(r[nb]['CTR']["Agent"])]])
+                mean = mean_ctr*(mean_pcs-mean_ncs)
+            mean = list(mean)
+            res_avg[m]['Mean'] += mean
+            std[m] += [mean]
+            
+    for nb in list(res_dict.keys()):
+        for m in ['CTR', 'Tot sales ATT', 'Share user with sale ATT', 'Tot sales', 'Share user with sale',
+                         'True CTR','True PCS','True OS','True NCS','NDPC','DPCSO','DPCSN']:
+            res_avg[m]['Mean'] = res_avg[m]['Mean']/len(r)
+            try:
+                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][2]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][3]) for i in range(len(r))])]
+            except:
+                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
+                                                 np.std([float(std[m][i][2]) for i in range(len(r))])]
+            res_avg[m]['se'] = res_avg[m]['std']/np.sqrt(len(r))
+    return res_avg
+
+def format_avg_result_extended(res_avg):
+    res_recap = pd.DataFrame(res_avg['CTR']['Agent'])
+    res = deepcopy(res_avg)
+    for m in ['CTR', 'Tot sales ATT', 'Share user with sale ATT', 'Tot sales', 'Share user with sale',
+                         'True CTR','True PCS','True OS','True NCS','NDPC','DPCSO','DPCSN']:
+        if m in ['CTR','True CTR']:
+            res[m]['Mean'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]['std'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["std"]], index = res[m].index)
+            res[m]['se'] = pd.Series(["{0:.3f}".format(val * 100) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+') %'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+') %'
+        elif m in ['Share user with sale ATT','Share user with sale','True OS','True PCS','True NCS']:
+            res[m]["Mean"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]["std"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["std"]], index = res[m].index)
+            res[m]["se"] = pd.Series(["{0:.2f}".format(val * 100) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+') %'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+') %'
+        elif m in ['NDPC','DPCSO','DPCSN']:
+            res[m]['Mean'] = pd.Series(["{0:.3f}".format(val * 1000) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]['std'] = pd.Series(["{0:.3f}".format(val * 1000) for val in res[m]["std"]], index = res[m].index)
+            res[m]['se'] = pd.Series(["{0:.3f}".format(val * 1000) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+') pm'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+') pm'
+        else :
+            res[m]["Mean"] = pd.Series([str(int(val)) for val in res[m]["Mean"]], index = res[m].index)
+            res[m]["std"] = pd.Series([str(int(val)) for val in res[m]["std"]], index = res[m].index)
+            res[m]["se"] = pd.Series([str(int(val)) for val in res[m]["se"]], index = res[m].index)
+            
+            res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+')'
+            res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
+        res_recap[m] =  res[m]['res_se']
+    if len(res_recap) == 4:
+        res_recap['Agent'] = ['Click','PDS','PCS','DPCS']
+    elif len(res_recap) == 3:
+        res_recap['Agent'] = ['Click','PCS','DPCS']
+    res_recap.columns = ['Agent','CTR','Att Sales','Att CR','Sales','CR',
+                         'True CTR','True PCS', 'True OS', 'True NCS',
+                         'NDPC','DPCSO','DPCSN']
+    # display(res_recap)
+    res_AB = res_recap[list(res_recap.columns)[:6]]
+    res_true = res_recap[['Agent']+list(res_recap.columns)[6:]]
+    print('-- A/B test --')
+    display(res_AB)
+    print('-- True metrics --')
+    display(res_true)
+    # print(res_recap.to_latex(index = False))
+    return (res_recap, res_recap.to_latex(index = False), 
+            res_AB, res_AB.to_latex(index = False), 
+            res_true, res_true.to_latex(index = False))
