@@ -652,15 +652,7 @@ def avg_result(res_dict):
     for nb in list(res_dict.keys()):
         for m in list(res_avg.keys())[:5]:
             res_avg[m]['Mean'] = res_avg[m]['Mean']/len(r)
-            try:
-                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][2]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][3]) for i in range(len(r))])]
-            except:
-                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][2]) for i in range(len(r))])]
+            res_avg[m]['std'] = [np.std([float(std[m][i][j]) for i in range(len(r))]) for j in range(len(std[m][0]))] 
             res_avg[m]['se'] = res_avg[m]['std']/np.sqrt(len(r))
     return res_avg
 
@@ -693,10 +685,12 @@ def format_avg_result(res_avg):
             res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+')'
             res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
         res_recap[m] =  res[m]['res_se']
-    if len(res_recap) == 4:
-        res_recap['Agent'] = ['Click','PDS','PCS','DPCS']
+    if len(res_recap) == 5:
+        res_recap['Agent'] = ['Rand','Click','PDS','PCS','DPCS']
+    elif len(res_recap) == 4:
+        res_recap['Agent'] = ['Rand','Click','PCS','DPCS']
     elif len(res_recap) == 3:
-        res_recap['Agent'] = ['Click','PCS','DPCS']
+        res_recap['Agent'] = ['Rand','PCS','DPCS']
     res_recap.columns = ['Agent','CTR','Att Sales','Att CR','Sales','CR']
     display(res_recap)
     # print(res_recap.to_latex(index = False))
@@ -756,15 +750,7 @@ def avg_result_extended(res_dict):
         for m in ['CTR', 'Tot sales ATT', 'Share user with sale ATT', 'Tot sales', 'Share user with sale',
                          'True CTR','True PCS','True OS','True NCS','NDPC','DPCSO','DPCSN']:
             res_avg[m]['Mean'] = res_avg[m]['Mean']/len(r)
-            try:
-                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][2]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][3]) for i in range(len(r))])]
-            except:
-                res_avg[m]['std'] = [np.std([float(std[m][i][0]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][1]) for i in range(len(r))]),
-                                                 np.std([float(std[m][i][2]) for i in range(len(r))])]
+            res_avg[m]['std'] = [np.std([float(std[m][i][j]) for i in range(len(r))]) for j in range(len(std[m][0]))] 
             res_avg[m]['se'] = res_avg[m]['std']/np.sqrt(len(r))
     return res_avg
 
@@ -802,10 +788,12 @@ def format_avg_result_extended(res_avg):
             res[m]['res'] = res[m]['Mean'] +' ('+res[m]['std']+')'
             res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
         res_recap[m] =  res[m]['res_se']
-    if len(res_recap) == 4:
-        res_recap['Agent'] = ['Click','PDS','PCS','DPCS']
+    if len(res_recap) == 5:
+        res_recap['Agent'] = ['Rand','Click','PDS','PCS','DPCS']
+    elif len(res_recap) == 4:
+        res_recap['Agent'] = ['Rand','Click','PCS','DPCS']
     elif len(res_recap) == 3:
-        res_recap['Agent'] = ['Click','PCS','DPCS']
+        res_recap['Agent'] = ['Rand','PCS','DPCS']
     res_recap.columns = ['Agent','CTR','Att Sales','Att CR','Sales','CR',
                          'True CTR','True PCS', 'True OS', 'True NCS',
                          'NDPC','DPCSO','DPCSN']

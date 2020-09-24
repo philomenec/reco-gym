@@ -1593,14 +1593,14 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
         name_extension += '_addonly'
     
     if additional_models_only == False:
-         # click agent
-        print("Click agent")
-        likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
-                                                      kronecker_features = kronecker_features,
-                                                      sample_weight = weights)
-        likelihood_logreg_click.train(data)
-        info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
-        save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
+        #  # click agent
+        # print("Click agent")
+        # likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
+        #                                               kronecker_features = kronecker_features,
+        #                                               sample_weight = weights)
+        # likelihood_logreg_click.train(data)
+        # info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
+        # save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
         
         # No discount
         print("No discount")
