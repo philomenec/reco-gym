@@ -231,6 +231,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             sessions, reward = self.generate_organic_sessions(initial_product) ##H
             # only attribute rewards that are post-click
             reward = reward*(click==1)
+            
         else:
             sessions = self.empty_sessions
             reward = 0
@@ -564,6 +565,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.ctr[self.current_user_id] = [] 
         self.current_ctr = None
         self.current_user_ps = self.config.psale_scale
+        # self.organic_proba_sales = None
         self.current_proba_sales = None
         self.last_proba_sales = self.organic_proba_sales
         self.user_ps_list.append(self.current_user_ps)
@@ -619,6 +621,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             [0, 1],
             p=[1 - ctr[recommendation], ctr[recommendation]]
         )
+        
         return click
 
     # Sample the next organic product view.

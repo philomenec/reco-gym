@@ -1338,7 +1338,7 @@ class SaleProductLikelihoodAgent(Agent):
 
 ## Function to train all agents at once
 def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_features=False,
-                 weights=False,additional_models_only = False,post_view_only=False, repo = 'data/'):
+                 weights=False, repo = 'data/'):
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1348,8 +1348,6 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
     Click_rewards = ClickRewardProvider()
     MDP_rewards = MDPRewardProvider()
     MDP_rewards_all = MDPRewardProvider(clicks_only=False)
-    # MDP_rewards_time = MDPRewardProvider(clicks_only=True, organic_only=False, normalize = True)
-    # MDP_rewards_all_time = MDPRewardProvider(clicks_only=False, organic_only=False, normalize = True)
     MDP_rewards_pureorganic = MDPRewardProvider(clicks_only=False, organic_only=True)
     PostDisplay_rewards = PostDisplayRewardProvider()
     Noclick_rewards_provider = NoclickRewardProdivder()
@@ -1365,191 +1363,49 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
         print("Weights")
         name_extension += 'weights'
     
-    if additional_models_only :
-        print('additional models only')
-        name_extension += '_addonly'
     
-    if (additional_models_only == False) & (post_view_only == False):
-        # click agent
-        print("Click agent")
-        likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
-                                                      kronecker_features = kronecker_features,
-                                                      sample_weight = weights)
-        likelihood_logreg_click.train(data)
-        info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
-        save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
-        
-        # post display agent
-        print("Post display agent")
-        likelihood_logreg_postd = SaleLikelihoodAgent(feature, PostDisplay_rewards,
-                                                      kronecker_features = kronecker_features,
-                                                      sample_weight = weights)
-        likelihood_logreg_postd.train(data)
-        info[likelihood_logreg_postd.info["Name"]] = likelihood_logreg_postd.info
-        save_agents["likelihood_logreg_postd"+name_extension] = likelihood_logreg_postd
-        
-        # No discount
-        print("No discount")
-        likelihood_saleclickprod_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_all], 
-                                                        discounts=[0,0],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                      sample_weight = weights)
-        likelihood_saleclickprod_all.train(data)
-        info[likelihood_saleclickprod_all.info["Name"]] = likelihood_saleclickprod_all.info
-        save_agents["likelihood_saleclickprod_all"+name_extension] = likelihood_saleclickprod_all
-        
-        # # No discount
-        # likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards], 
-        #                                                 discounts=[0,0],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                               sample_weight = weights)
-        # likelihood_saleclickprod.train(data)
-        # info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
-        # save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
-        
-        # # non-specific discount, all observations
-        # print("Non specific discount")
-        # likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                              sample_weight = weights)
-        # likelihood_saleclickprod_discount_all.train(data)
-        # info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-        # save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-        # # non-specific discount, clicked observations
-        # likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount.train(data)
-        # info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-        # save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-        # # Per product discount, all observations
-        # print("Specific discount")
-        # likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                              sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe_all.train(data)
-        # info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-        # save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-        # # Per product discount, clicked observations
-        # likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                              sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe.train(data)
-        # info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-        # save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
-        
-        # non-specific discount, all observations
-        print("Discount")
-        likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_all,Noclick_rewards_provider], 
-                                                        discounts=[0,0,-1],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                     sample_weight = weights)
-        likelihood_saleclickprod_discount_all.train(data)
-        info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-        save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-        # # non-specific discount, clicked observations
-        # likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount.train(data)
-        # info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-        # save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-        # # Per product discount, all observations
-        # print("Specific discount noclick")
-        # likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all,Noclick_rewards_provider], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                              sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe_all.train(data)
-        # info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-        # save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-        # # Per product discount, clicked observations
-        # likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                              sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe.train(data)
-        # info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-        # save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
+    # click agent
+    print("Click agent")
+    likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
+                                                  kronecker_features = kronecker_features,
+                                                  sample_weight = weights)
+    likelihood_logreg_click.train(data)
+    info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
+    save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
     
+    # post display agent
+    print("Post display agent")
+    likelihood_logreg_postd = SaleLikelihoodAgent(feature, PostDisplay_rewards,
+                                                  kronecker_features = kronecker_features,
+                                                  sample_weight = weights)
+    likelihood_logreg_postd.train(data)
+    info[likelihood_logreg_postd.info["Name"]] = likelihood_logreg_postd.info
+    save_agents["likelihood_logreg_postd"+name_extension] = likelihood_logreg_postd
+        
+    # No discount, clicked observations
+    print("No discount")    
+    likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
+                                                    reward_provider_list=[Click_rewards,MDP_rewards], 
+                                                    discounts=[0,0],discounts_with_action=False,
+                                                    kronecker_features = kronecker_features,
+                                                  sample_weight = weights)
+    likelihood_saleclickprod.train(data)
+    info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
+    save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
     
-    if post_view_only :
-        # post display agent multiplied by user features
-        print("Post display Mult agent")
-        likelihood_logreg_postdMult = SaleLikelihoodAgent(feature, PostDisplay_rewards,
-                                                      kronecker_features = kronecker_features,
-                                                      sample_weight = weights
-                                                      # , multiply_features = True
-                                                      )
-        likelihood_logreg_postdMult.train(data)
-        info[likelihood_logreg_postdMult.info["Name"]] = likelihood_logreg_postdMult.info
-        save_agents["likelihood_logreg_postdMult"+name_extension] = likelihood_logreg_postdMult
-        
+      
+    # non-specific discount, clicked observations
+    print("Discount")    
+    likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
+                                                    reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
+                                                    discounts=[0,0,-1],discounts_with_action=False,
+                                                    kronecker_features = kronecker_features,
+                                                    sample_weight = weights)
+    likelihood_saleclickprod_discount.train(data)
+    info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
+    save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
     
-    # else:
-    #     # non-specific discount, all observations
-    #     print("Non specific discount noclick")
-    #     likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-    #                                                     reward_provider_list=[Click_rewards,MDP_rewards_all,Noclick_rewards_provider], 
-    #                                                     discounts=[0,0,-1],discounts_with_action=False,
-    #                                                     kronecker_features = kronecker_features,
-    #                                                  sample_weight = weights)
-    #     likelihood_saleclickprod_discount_all.train(data)
-    #     info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-    #     save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-    #     # non-specific discount, clicked observations
-    #     likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-    #                                                     reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
-    #                                                     discounts=[0,0,-1],discounts_with_action=False,
-    #                                                     kronecker_features = kronecker_features,
-    #                                                     sample_weight = weights)
-    #     likelihood_saleclickprod_discount.train(data)
-    #     info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-    #     save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-    #     # Per product discount, all observations
-    #     print("Specific discount noclick")
-    #     likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-    #                                                     reward_provider_list=[Click_rewards,MDP_rewards_all,Noclick_rewards_provider], 
-    #                                                     discounts=[0,0,-1],discounts_with_action=False,
-    #                                                     kronecker_features = kronecker_features,
-    #                                                  sample_weight = weights)
-    #     likelihood_saleclickprod_discount_spe_all.train(data)
-    #     info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-    #     save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-    #     # Per product discount, clicked observations
-    #     likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-    #                                                     reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
-    #                                                     discounts=[0,0,-1],discounts_with_action=False,
-    #                                                     kronecker_features = kronecker_features,
-    #                                                  sample_weight = weights)
-    #     likelihood_saleclickprod_discount_spe.train(data)
-    #     info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-    #     save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
-    
+   
     pkl.dump([info,save_agents],open(str(repo) + str('agents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
     return info, save_agents
 
@@ -1557,7 +1413,7 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
 
 
 def train_timeagents(name_logging,logs,feature_name,features, num_users, kronecker_features=False, linear_reg=False,
-                     weights=False,additional_models_only = False, repo = 'data/'):
+                     weights=False, repo = 'data/'):
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1565,12 +1421,9 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
     
     # reward providers
     Click_rewards = ClickRewardProvider()
-    # MDP_rewards = MDPRewardProvider()
-    # MDP_rewards_all = MDPRewardProvider(clicks_only=False)
     MDP_rewards_time = MDPRewardProvider(clicks_only=True, organic_only=False, normalize = True)
     MDP_rewards_all_time = MDPRewardProvider(clicks_only=False, organic_only=False, normalize = True)
     MDP_rewards_pureorganic = MDPRewardProvider(clicks_only=False, organic_only=True)
-    # PostDisplay_rewards = PostDisplayRewardProvider()
     Noclick_rewards_provider = NoclickRewardProdivder()
     Noclick_rewards_provider_time = NoclickRewardProdivder(normalize = True)
     
@@ -1587,183 +1440,32 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
     if weights==True:
         print("Weights")
         name_extension += 'weights'
-        
-    if additional_models_only :
-        print("addition models only")
-        name_extension += '_addonly'
+   
+
+    # No discount
+    print("No discount")
+    likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
+                                                    reward_provider_list=[Click_rewards,MDP_rewards_time], 
+                                                    discounts=[0,0],discounts_with_action=False,
+                                                    kronecker_features = kronecker_features,
+                                                    linear_reg = linear_reg,
+                                                    sample_weight = weights)
+    likelihood_saleclickprod.train(data)
+    info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
+    save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
     
-    if additional_models_only == False:
-        #  # click agent
-        # print("Click agent")
-        # likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
-        #                                               kronecker_features = kronecker_features,
-        #                                               sample_weight = weights)
-        # likelihood_logreg_click.train(data)
-        # info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
-        # save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
+    print("Discount")
+    # non-specific discount, clicked observations
+    likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
+                                                    reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
+                                                    discounts=[0,0,-1],discounts_with_action=False,
+                                                    kronecker_features = kronecker_features,
+                                                    linear_reg = linear_reg,
+                                                    sample_weight = weights)
+    likelihood_saleclickprod_discount.train(data)
+    info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
+    save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
         
-        # No discount
-        print("No discount")
-        likelihood_saleclickprod_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_all_time], 
-                                                        discounts=[0,0],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                        linear_reg = linear_reg,
-                                                        sample_weight = weights)
-        likelihood_saleclickprod_all.train(data)
-        info[likelihood_saleclickprod_all.info["Name"]] = likelihood_saleclickprod_all.info
-        save_agents["likelihood_saleclickprod_all"+name_extension] = likelihood_saleclickprod_all
-        
-        # # No discount
-        # likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time], 
-        #                                                 discounts=[0,0],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod.train(data)
-        # info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
-        # save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
-        
-        # # non-specific discount, all observations
-        # print("Non specific discount")
-        # likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all_time,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_all.train(data)
-        # info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-        # save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-        # # non-specific discount, clicked observations
-        # likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount.train(data)
-        # info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-        # save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-        # # Per product discount, all observations
-        # print("Specific discount")
-        # likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all_time,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe_all.train(data)
-        # info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-        # save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-        # # Per product discount, clicked observations
-        # likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time,MDP_rewards_pureorganic], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe.train(data)
-        # info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-        # save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
-    
-        # non-specific discount, all observations
-        print("Discount")
-        likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_all_time,Noclick_rewards_provider_time], 
-                                                        discounts=[0,0,-1],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                        linear_reg = linear_reg,
-                                                        sample_weight = weights)
-        likelihood_saleclickprod_discount_all.train(data)
-        info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-        save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-        # # non-specific discount, clicked observations
-        # likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount.train(data)
-        # info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-        # save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-        # # Per product discount, all observations
-        # print("Specific discount noclick")
-        # likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all_time,Noclick_rewards_provider_time], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe_all.train(data)
-        # info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-        # save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-        # # Per product discount, clicked observations
-        # likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe.train(data)
-        # info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-        # save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
-    
-    else:
-        # non-specific discount, all observations
-        print("Non specific discount noclick")
-        likelihood_saleclickprod_discount_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_all_time,Noclick_rewards_provider_time], 
-                                                        discounts=[0,0,-1],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                        linear_reg = linear_reg,
-                                                        sample_weight = weights)
-        likelihood_saleclickprod_discount_all.train(data)
-        info[likelihood_saleclickprod_discount_all.info["Name"]] = likelihood_saleclickprod_discount_all.info
-        save_agents["likelihood_saleclickprod_discount_all"+name_extension] = likelihood_saleclickprod_discount_all
-        
-        # non-specific discount, clicked observations
-        likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                        reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
-                                                        discounts=[0,0,-1],discounts_with_action=False,
-                                                        kronecker_features = kronecker_features,
-                                                        linear_reg = linear_reg,
-                                                        sample_weight = weights)
-        likelihood_saleclickprod_discount.train(data)
-        info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-        save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
-        
-        # # Per product discount, all observations
-        # print("Specific discount noclick")
-        # likelihood_saleclickprod_discount_spe_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_all_time,Noclick_rewards_provider_time], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe_all.train(data)
-        # info[likelihood_saleclickprod_discount_spe_all.info["Name"]] = likelihood_saleclickprod_discount_spe_all.info
-        # save_agents["likelihood_saleclickprod_discount_spe_all"+name_extension] = likelihood_saleclickprod_discount_spe_all
-        
-        # # Per product discount, clicked observations
-        # likelihood_saleclickprod_discount_spe = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-        #                                                 reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
-        #                                                 discounts=[0,0,-1],discounts_with_action=False,
-        #                                                 kronecker_features = kronecker_features,
-        #                                                 linear_reg = linear_reg,
-        #                                                 sample_weight = weights)
-        # likelihood_saleclickprod_discount_spe.train(data)
-        # info[likelihood_saleclickprod_discount_spe.info["Name"]] = likelihood_saleclickprod_discount_spe.info
-        # save_agents["likelihood_saleclickprod_discount_spe"+name_extension] = likelihood_saleclickprod_discount_spe
-    
     
     try:
         pkl.dump([info,save_agents],open(str(repo)+str('timeagents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
@@ -1772,57 +1474,3 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
     return info, save_agents
 
 
-def train_difftimeagents(name_logging,logs,feature_name,features, num_users, kronecker_features=False, linear_reg=False, repo = 'data/'):
-    info = {}
-    save_agents = {}
-    data = logs[name_logging]
-    feature = features[feature_name]
-    
-    # reward providers
-    Click_rewards = ClickRewardProvider()
-    # MDP_rewards = MDPRewardProvider()
-    # MDP_rewards_all = MDPRewardProvider(clicks_only=False)
-    MDP_rewards_time = MDPRewardProvider(clicks_only=True, organic_only=False, normalize = True)
-    MDP_rewards_all_time = MDPRewardProvider(clicks_only=False, organic_only=False, normalize = True)
-    MDP_rewards_pureorganic = MDPRewardProvider(clicks_only=False, organic_only=True)
-    # PostDisplay_rewards = PostDisplayRewardProvider()
-    Diff_rewards = DifferenceRewardProvider(MDP_rewards_all_time,MDP_rewards_pureorganic,normalize = False)
-    Diff_rewards_norm = DifferenceRewardProvider(MDP_rewards_all_time,MDP_rewards_pureorganic,normalize = True)
-    
-    name_extension = 'time'
-    
-    if kronecker_features==True:
-        print("Kronecker features")
-        name_extension += 'kron'
-    if linear_reg ==True:
-        print("Linear reg")
-        name_extension += 'lin'
-        
- 
-    # Difference in rewards with non-specific discount
-    print("Difference")
-    # no normalization in case of negative labels
-    likelihood_saleclickprod_diff_all = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                    reward_provider_list=[Click_rewards,Diff_rewards], 
-                                                    discounts=[0,0],discounts_with_action=False,
-                                                    kronecker_features = kronecker_features,
-                                                    linear_reg = linear_reg)
-    likelihood_saleclickprod_diff_all.train(data)
-    info[likelihood_saleclickprod_diff_all.info["Name"]] = likelihood_saleclickprod_diff_all.info
-    save_agents["likelihood_saleclickprod_diff_all"+name_extension] = likelihood_saleclickprod_diff_all
-    
-    # with normalization to avoid negative labels
-    likelihood_saleclickprod_diff_all_norm = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                    reward_provider_list=[Click_rewards,Diff_rewards_norm], 
-                                                    discounts=[0,0],discounts_with_action=False,
-                                                    kronecker_features = kronecker_features,
-                                                    linear_reg = linear_reg)
-    likelihood_saleclickprod_diff_all_norm.train(data)
-    info[likelihood_saleclickprod_diff_all_norm.info["Name"]] = likelihood_saleclickprod_diff_all_norm.info
-    save_agents["likelihood_saleclickprod_diff_all_norm"+name_extension] = likelihood_saleclickprod_diff_all_norm
-    
-
-    
-    
-    pkl.dump([info,save_agents],open(str(repo)+str('difftimeagents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
-    return info, save_agents
