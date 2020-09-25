@@ -686,7 +686,7 @@ def format_avg_result(res_avg):
             res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
         res_recap[m] =  res[m]['res_se']
     if len(res_recap) == 5:
-        res_recap['Agent'] = ['Rand','Click','PDS','PCS','DPCS']
+        res_recap['Agent'] = ['Rand','Click','PVS','PCS','DPCS']
     elif len(res_recap) == 4:
         res_recap['Agent'] = ['Rand','Click','PCS','DPCS']
     elif len(res_recap) == 3:
@@ -789,7 +789,7 @@ def format_avg_result_extended(res_avg):
             res[m]['res_se'] = res[m]['Mean'] +' ('+res[m]['se']+')'
         res_recap[m] =  res[m]['res_se']
     if len(res_recap) == 5:
-        res_recap['Agent'] = ['Rand','Click','PDS','PCS','DPCS']
+        res_recap['Agent'] = ['Rand','Click','PVS','PCS','DPCS']
     elif len(res_recap) == 4:
         res_recap['Agent'] = ['Rand','Click','PCS','DPCS']
     elif len(res_recap) == 3:
