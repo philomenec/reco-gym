@@ -31,6 +31,11 @@ import pickle as pkl
 from datetime import datetime
 from IPython.display import display
 
+from joblib import Parallel, delayed
+from recogym.agents.sale_agent import train_agents, train_timeagents
+from recogym.envs.utils_sale import format_avg_result_extended, avg_result_extended 
+
+
 GraphSalesMin = 0.009
 GraphSalesMax = 0.021
 

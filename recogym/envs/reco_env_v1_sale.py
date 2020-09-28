@@ -459,12 +459,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         unique_user_id = 0
         for _ in trange(num_organic_offline_users, desc='Organic Users'):
+        # for _ in range(num_organic_offline_users, desc='Organic Users'):
             self.reset(unique_user_id)
             unique_user_id += 1
             observation, _, _, _ = self.step(None)
             _store_organic(observation)
 
         for _ in trange(num_offline_users, desc='Users'):
+        # for _ in range(num_offline_users, desc='Users'):
             self.reset(unique_user_id)
             unique_user_id += 1
             observation, reward, done, info = self.step(None)

@@ -16,6 +16,8 @@ from recogym.util import FullBatchLBFGS
 import pandas as pd
 from IPython.display import display
 
+
+
 P = 10  # Number of Products
 U = 2000 # Number of Users
 
@@ -808,3 +810,5 @@ def format_avg_result_extended(res_avg):
     return (res_recap, res_recap.to_latex(index = False), 
             res_AB, res_AB.to_latex(index = False), 
             res_true, res_true.to_latex(index = False))
+
+ 
