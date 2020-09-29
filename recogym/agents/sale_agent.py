@@ -45,46 +45,6 @@ class FracLogisticRegression(LinearRegression):
 
 
 
-################################################################
-################################ Extract pure organic data #####
-################################################################
-
-
-# class PureOrganicEventProvider(FeatureProvider):
-#     """Reward shaping class"""
-
-#     def __init__(self, clicks_only=False):
-#         self.data_organic = None
-#         self.clicks_only = clicks_only
-        
-#     def observe(self, data):
-#         pure_organic_df = data[:0].copy()
-#         for u in data["u"].unique():
-#             beginning_index = data[data["u"]==u].index[0]
-#             if len(data[data["u"]==u].loc[data["c"]==1])>0:
-#                 end_index = data[data["u"]==u].loc[data["c"]==1].index[0] #dont include the first click
-#             else :
-#                 end_index = data[data["u"]==u].index[len(data[data["u"]==u])-1]+1 #Include the last index
-#             pure_organic_df = pd.concat([pure_organic_df,data.iloc[beginning_index:end_index]])
-#         pure_organic_df.index = range(len(pure_organic_df))
-#         self.data_organic = pure_organic_df
-
-#     def features(self):
-#         return self.data_organic
-    
-#     def reset(self):
-#         self.data_organic = None
-        
-#     @property
-#     def name(self):
-#         name = "PureOrganicEventProvider"
-#         if self.clicks_only == False:
-#             name += "_all"
-#         return name
-
-
-
-
 
 ################################################################
 ################################ Reward shaping ################
@@ -631,7 +591,7 @@ class ShareViewsFeatureProvider(FeatureProvider):
         self.user_counts = np.zeros(self.num_products)
         self.user_features = np.zeros(self.num_products)
         
-    def observe(self, data):
+    def observe(self, data, memory = True):
         if type(data) == pd.core.series.Series:
             if data["z"]=="organic":
                 views = [(data["v"]==p)*1 for p in range(self.num_products)]
@@ -640,7 +600,10 @@ class ShareViewsFeatureProvider(FeatureProvider):
         else :
             data_organic = data.loc[data["z"]=="organic"].loc[data["v"]>=0]
             views = [np.sum(data_organic["v"]==p) for p in range(self.num_products)]
-        self.user_counts += np.array(views)
+        if not memory:
+            self.user_counts = np.array(views)
+        else:
+            self.user_counts += np.array(views)
         nb_views = np.sum(self.user_counts)
         if nb_views>0:
             self.user_features = self.user_counts/nb_views
@@ -1032,7 +995,7 @@ class SaleLikelihoodAgent(Agent):
     def act(self, observation, reward, done):
         """Act method returns an action based on current observation and past history"""
         logged_observation = self.observation_to_log(observation)
-        self.feature_provider.observe(logged_observation)      
+        self.feature_provider.observe(logged_observation,memory=False)      
         user_state = self.feature_provider.features()
         if (self.epsilon_greedy == True) & (np.random.rand() < self.epsilon) : 
             print("Explore")
@@ -1259,14 +1222,14 @@ class SaleProductLikelihoodAgent(Agent):
             for i in range(len(self.index_discounted)):
                 ## main (discounted) model 
                 feature_provider = self.feature_provider_list[self.index_discounted[i]]
-                feature_provider.observe(logged_observation) 
+                feature_provider.observe(logged_observation,memory=False) 
                 user_state = feature_provider.features()
                 before_discount = self._score_products(user_state, 
                                                        self.models[self.index_discounted[i]])
                 
                 ## model used as discount
                 feature_provider = self.feature_provider_list[self.index_discount[i]]
-                feature_provider.observe(logged_observation)      
+                feature_provider.observe(logged_observation,memory=False)      
                 user_state = feature_provider.features()
                 user_state = user_state.reshape(1, -1)
                 if self.models[self.index_discount[i]] is not None :
@@ -1299,7 +1262,7 @@ class SaleProductLikelihoodAgent(Agent):
             
             for i in set(range(self.num_models))-set.union(set(self.index_discount),set(self.index_discounted)):
                 feature_provider = self.feature_provider_list[i]
-                feature_provider.observe(logged_observation)      
+                feature_provider.observe(logged_observation,memory=False)      
                 user_state = feature_provider.features()
                 score = score*self._score_products(user_state, self.models[i])
             # if self.softmax == False:

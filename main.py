@@ -13,14 +13,25 @@ import os
 
 # #### Settings --- to change!!
 
+
+# Number of cores
+num_cores = 4
 # Number of users for the training
 num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
 num_AB_tests = 50
-# Number of cores
-num_cores = 4
+
+## tests
+# # Number of users for the training
+# num_users = 6
+# # Number of users for the A/B test
+# num_users_AB = 7
+# # Number of A/B tests
+# num_AB_tests = 2
+
+
 
 
 
