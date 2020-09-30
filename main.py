@@ -17,20 +17,20 @@ import os
 # Number of cores
 num_cores = 8
 
-# # Number of users for the training
-# num_users = 5000
-# # Number of users for the A/B test
-# num_users_AB = 5000
-# # Number of A/B tests
-# num_AB_tests = 50
-
-# tests
 # Number of users for the training
-num_users = 6
+num_users = 5000
 # Number of users for the A/B test
-num_users_AB = 7
+num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 2
+num_AB_tests = 50
+
+# # tests
+# # Number of users for the training
+# num_users = 6
+# # Number of users for the A/B test
+# num_users_AB = 7
+# # Number of A/B tests
+# num_AB_tests = 2
 
 
 
