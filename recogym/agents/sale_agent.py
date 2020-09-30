@@ -794,7 +794,6 @@ def build_train_data(logs, feature_provider, reward_provider, weights=False):
         feature_sum = feature_provider.features()
         
         if index in train_log.index :
-        # if index in np.array(train_log.index)-1 :
             user_states.append(feature_sum)
             assert train_log["u"][index] == current_user  
             

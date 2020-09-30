@@ -15,23 +15,22 @@ import os
 
 
 # Number of cores
-num_cores = 4
-# Number of users for the training
-num_users = 5000
-# Number of users for the A/B test
-num_users_AB = 5000
-# Number of A/B tests
-num_AB_tests = 50
+num_cores = 8
 
-## tests
 # # Number of users for the training
-# num_users = 6
+# num_users = 5000
 # # Number of users for the A/B test
-# num_users_AB = 7
+# num_users_AB = 5000
 # # Number of A/B tests
-# num_AB_tests = 2
+# num_AB_tests = 50
 
-
+# tests
+# Number of users for the training
+num_users = 6
+# Number of users for the A/B test
+num_users_AB = 7
+# Number of A/B tests
+num_AB_tests = 2
 
 
 
@@ -44,10 +43,13 @@ print('Number of products =',num_products)
 print('Number of flips =',env_1_sale_args['number_of_flips'])
 nb_flips = env_1_sale_args['number_of_flips']
 env_1_sale_args['mu_sale'] = False 
+# env_1_sale_args['kappa'] = 0.5
 print('Value of kappa =',env_1_sale_args['kappa'])
 env_1_sale_args['num_users'] = num_users
 env_1_sale_args['num_users_AB'] = num_users_AB
 
+
+name_run = ''
 
 # Initialize the gym 
 env = gym.make('reco-gym-sale-v1')
@@ -77,26 +79,46 @@ agents[name_agent] = random_agent
 
 #### Logs
 print("--- Generate logs ---")
-logs={}
-logs[name_agent] = deepcopy(env).generate_logs(num_users)
-pkl.dump(logs[name_agent], open(data_repo + 'data' + str(num_users) + name_agent + '.pkl','wb'))
-
-
-run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores)
-run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores)
-run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores)
-run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores)
-
-# # 4 types of training and A/B tests to do in parallel (weights or no weights/Proportion VS presence of sale)
-# list_runs = [run_pres_noweight,run_pres_weight,run_prop_noweight,run_prop_weight]
-# def run(i):
-#     # Each type of training and A/B test is also parallelised (loop for the A/B test)
-#     return list_runs[i](logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,int(num_cores/len(list_runs)))
-# res = Parallel(n_jobs=int(num_cores), verbose=10)(delayed(run)(i) for i in range(len(list_runs)))
+try:
+    logs = {name_agent:pd.read_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv')}
+except:
+    
+    logs = {name_agent:deepcopy(env).generate_logs(num_users)}
+    logs[name_agent].to_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv',index = False)
 
 
 
+# Equal sample weights
+run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                  num_AB_tests, env, agents,data_repo,num_cores,name_run)
+run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                  num_AB_tests, env, agents,data_repo,num_cores,name_run)
+# Sample Weights
+run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                num_AB_tests, env, agents,data_repo,num_cores,name_run)
+run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                num_AB_tests, env, agents,data_repo,num_cores,name_run)
 
 
 
+# def run_tests(test_type,logs=logs,name_agent=name_agent,feature_name=feature_name,
+#               features=features,num_users=num_users,num_users_AB=num_users_AB,
+#                 num_AB_tests=num_AB_tests, env=env, agents=agents,data_repo=data_repo,
+#                 num_cores=int(num_cores/4),name_run=name_run):
+#     if test_type == 'pres':
+#         run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
+#     if test_type == 'presweights':
+#         run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
+#     if test_type == 'prop':
+#         run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
+#     if test_type == 'propweights':
+#         run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
+    
+    
+# Parallel(n_jobs=num_cores, verbose=10)(delayed(run_tests)(test_type) 
+#                                               for test_type in ['pres','presweights','prop','propweights'])
 

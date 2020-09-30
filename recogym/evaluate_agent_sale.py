@@ -1207,6 +1207,7 @@ def display_metrics(res,metrics = list_metrics):
 
 def verify_agents_sale_extended(env, number_of_users, agents, agent_reset = False, name = '',seed=0,
                        same_env = True, repo = 'data/'): ##H
+    
     stat = {
         'Agent': [],
         '0.025': [],
@@ -1301,9 +1302,9 @@ def verify_agents_sale_extended(env, number_of_users, agents, agent_reset = Fals
         try :
             if same_env:
                 envcopy = deepcopy(env)
-                envcopy.reset(seed)
             else:
                 envcopy = env
+                envcopy.reset_random_seed(seed)
             if agent_reset == True :
                 agents[agent_id].reset()
             

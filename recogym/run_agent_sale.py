@@ -17,7 +17,7 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
             **agents, 
             **save_agents},
         name = name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension,
-        seed = 0,
+        seed = i,
         same_env = False,
         repo = data_repo
     )
@@ -32,11 +32,13 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
 
 
 
-def run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores):
-    name_extension = 'pres'
+def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+    name_extension = 'pres'+str(name_run)
     name_logging = name_agent
+    logs = deepcopy(log)
     info, save_agents = train_agents(name_logging,logs,feature_name,features, num_users=num_users, 
                                          kronecker_features=True,repo = data_repo)
+    print("----------------"+name_extension+"----------------")
     def run_func(i):
         return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
@@ -54,11 +56,14 @@ def run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_
     res_true.to_csv(data_repo+"clean/res_true_"+name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension+".csv",index = False)
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
-def run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores):
-    name_extension = 'presweights'
+def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+    name_extension = 'presweights'+str(name_run)
     name_logging = name_agent
+    logs = deepcopy(log)
     info, save_agents = train_agents(name_logging,logs,feature_name,features, num_users=num_users, 
                                          kronecker_features=True,weights = True, repo = data_repo)
+    print("----------------"+name_extension+"----------------")
+   
     def run_func(i):
         return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
@@ -77,11 +82,14 @@ def run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
 
-def run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores):
-    name_extension = 'prop'
+def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+    name_extension = 'prop'+str(name_run)
     name_logging = name_agent
+    logs = deepcopy(log)
     info, save_agents = train_timeagents(name_logging,logs,feature_name,features, num_users=num_users, 
                                          kronecker_features=True,linear_reg=True, repo = data_repo)
+    print("----------------"+name_extension+"----------------")
+    
     def run_func(i):
         return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
@@ -99,11 +107,14 @@ def run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_
     res_true.to_csv(data_repo+"clean/res_true_"+name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension+".csv",index = False)
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
-def run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores):
-    name_extension = 'propweights'
+def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+    name_extension = 'propweights'+str(name_run)
     name_logging = name_agent
+    logs = deepcopy(log)
     info, save_agents = train_timeagents(name_logging,logs,feature_name,features, num_users=num_users, 
                                          kronecker_features=True,linear_reg=True, weights = True, repo = data_repo)
+    print("----------------"+name_extension+"----------------")
+    
     def run_func(i):
         return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
