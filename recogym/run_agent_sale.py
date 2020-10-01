@@ -8,7 +8,7 @@ import pickle as pkl
 
 # function used for parallelisation, where i is the nb of the A/B test
 def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_logging,feature_name,data_repo):
-    print("-------------- A/B test n°"+str(i)+'--------------')
+    print("-------------- A/B test nb"+str(i)+'--------------')
     name_extension = name_ext+'_nb'+str(i)
     res=verify_agents_sale_extended(
         env,
