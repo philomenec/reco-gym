@@ -14,24 +14,24 @@ import numpy as np
 # #### Settings --- to change!!
 
 
-# Number of cores
-num_cores = 40
-# Number of users for the training
-num_users = 5000
-# Number of users for the A/B test
-num_users_AB = 5000
-# Number of A/B tests
-num_AB_tests = 25
-
-# # tests
 # # Number of cores
-# num_cores = 4
+# num_cores = 40
 # # Number of users for the training
-# num_users = 6
+# num_users = 5000
 # # Number of users for the A/B test
-# num_users_AB = 7
+# num_users_AB = 5000
 # # Number of A/B tests
-# num_AB_tests = 2
+# num_AB_tests = 25
+
+# tests
+# Number of cores
+num_cores = 4
+# Number of users for the training
+num_users = 6
+# Number of users for the A/B test
+num_users_AB = 7
+# Number of A/B tests
+num_AB_tests = 2
 
 #### Configuration !!
 config_dict = {'cl_mem':{'click':True,'memory':True},
@@ -98,12 +98,12 @@ for i in range(len(config_dict)):
     config = config_dict[name_run]
     # Equal sample weights
     run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config)
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save=False)
     run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     # Sample Weights
     run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     

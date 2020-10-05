@@ -21,22 +21,22 @@ num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 25
+num_AB_tests_list = [50,25,25]
 
 # # tests
 # # Number of cores
 # num_cores = 4
 # # Number of users for the training
-# num_users = 6
+# num_users = 5
 # # Number of users for the A/B test
-# num_users_AB = 7
+# num_users_AB = 2
 # # Number of A/B tests
-# num_AB_tests = 2
+# num_AB_tests_list =[1,2,2]
 
 #### Configuration !!
-# config_dict = {'cl_mem':{'click':True,'memory':True},
-               # 'nocl_mem':{'click':False,'memory':True}}
-config_dict = {'nocl_mem':{'click':False,'memory':True}}
+config_dict = {'cl_nomem':{'click':True,'memory':False},
+               'cl_mem':{'click':True,'memory':True},
+                'nocl_mem':{'click':False,'memory':True}}
 names_runs = list(config_dict.keys())
 
 
@@ -95,14 +95,17 @@ for i in range(len(config_dict)):
     print(f'------------------- Config nb {i}')
     name_run = names_runs[i]
     config = config_dict[name_run]
-    # Equal sample weights
-    run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config)
-    run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+    num_AB_tests = num_AB_tests_list[i]
+    # already run for the first configuration
+    if i>0:
+        # Equal sample weights
+        run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                          num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save=False)
+        run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                          num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     # Sample Weights
     run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     

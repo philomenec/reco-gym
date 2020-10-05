@@ -7,7 +7,7 @@ from copy import deepcopy
 import pickle as pkl
 
 # function used for parallelisation, where i is the nb of the A/B test
-def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_logging,feature_name,data_repo):
+def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_logging,feature_name,data_repo,save):
     print("-------------- A/B test nb"+str(i)+'--------------')
     name_extension = name_ext+'_nb'+str(i)
     res=verify_agents_sale_extended(
@@ -19,7 +19,8 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
         name = name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension,
         seed = i,
         same_env = False,
-        repo = data_repo
+        repo = data_repo,
+        save=save
     )
 
     r = deepcopy(res)
@@ -33,7 +34,7 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
 
 
 def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config):
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save):
     name_extension = 'pres'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -46,9 +47,14 @@ def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_A
                                          click=click, memory=memory, repo = data_repo)
     print("----------------"+name_extension+"----------------")
     def run_func(i):
-        return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+        if i==0:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
-                                    data_repo=data_repo)
+                                    data_repo=data_repo,save=True)
+        else:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+                                    agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
+                                    data_repo=data_repo,save=save)
     r_list = Parallel(n_jobs=int(num_cores), verbose=50)(delayed(run_func)(i) for i in range(num_AB_tests))
     
     res_dict = {r_list[i]['name']:r_list[i] for i in range(len(r_list))}
@@ -63,7 +69,7 @@ def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_A
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
 def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
     name_extension = 'presweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -77,9 +83,14 @@ def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
     print("----------------"+name_extension+"----------------")
    
     def run_func(i):
-        return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+        if i==0:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
-                                    data_repo=data_repo)
+                                    data_repo=data_repo,save=True)
+        else:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+                                    agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
+                                    data_repo=data_repo,save=save)
     r_list = Parallel(n_jobs=int(num_cores), verbose=50)(delayed(run_func)(i) for i in range(num_AB_tests))
     
     res_dict = {r_list[i]['name']:r_list[i] for i in range(len(r_list))}
@@ -95,7 +106,7 @@ def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
 
 
 def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
-                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
     name_extension = 'prop'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -109,9 +120,14 @@ def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_A
     print("----------------"+name_extension+"----------------")
     
     def run_func(i):
-        return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+        if i==0:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
-                                    data_repo=data_repo)
+                                    data_repo=data_repo,save=True)
+        else:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+                                    agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
+                                    data_repo=data_repo,save=save)
     r_list = Parallel(n_jobs=int(num_cores), verbose=50)(delayed(run_func)(i) for i in range(num_AB_tests))
     
     res_dict = {r_list[i]['name']:r_list[i] for i in range(len(r_list))}
@@ -126,7 +142,7 @@ def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_A
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
 def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
     name_extension = 'propweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -140,9 +156,14 @@ def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
     print("----------------"+name_extension+"----------------")
     
     def run_func(i):
-        return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+        if i==0:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
                                     agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
-                                    data_repo=data_repo)
+                                    data_repo=data_repo,save=True)
+        else:
+            return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
+                                    agents=agents,save_agents=save_agents,name_logging=name_logging,feature_name=feature_name,
+                                    data_repo=data_repo,save=save)
     r_list = Parallel(n_jobs=int(num_cores), verbose=50)(delayed(run_func)(i) for i in range(num_AB_tests))
     
     res_dict = {r_list[i]['name']:r_list[i] for i in range(len(r_list))}

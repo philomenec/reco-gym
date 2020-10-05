@@ -1206,7 +1206,7 @@ def display_metrics(res,metrics = list_metrics):
 
 
 def verify_agents_sale_extended(env, number_of_users, agents, agent_reset = False, name = '',seed=0,
-                       same_env = True, repo = 'data/'): ##H
+                       same_env = True, repo = 'data/',save=True): ##H
     
     stat = {
         'Agent': [],
@@ -1433,8 +1433,6 @@ def verify_agents_sale_extended(env, number_of_users, agents, agent_reset = Fals
                             'config_list':config_list[agent_id],
                             'all_data':all_data[agent_id],
                             'report_issue':report_issue}
-            pkl.dump(agent_dico, open(str(repo)+'res_'+name+agent_id+'_full.pkl',"wb"))
-            
             
         except Exception as e:
             print("Issue with agent : ",agent_id)
@@ -1457,8 +1455,13 @@ def verify_agents_sale_extended(env, number_of_users, agents, agent_reset = Fals
             'config_list':config_list,
             'all_data':all_data,
             'report_issue':report_issue}
-            pkl.dump(dico, open(str(repo)+'res_before_crash'+name+str(int(datetime.timestamp(datetime.now())))+'_full.pkl',"wb"))
-            
+            if save:
+                pkl.dump(dico, open(str(repo)+'res_before_crash'+name+str(int(datetime.timestamp(datetime.now())))+'_full.pkl',"wb"))
+    
+    if save:
+        pkl.dump(agent_dico, open(str(repo)+'res_'+name+agent_id+'_full.pkl',"wb"))
+                    
+    
     return {'CTR': pd.DataFrame().from_dict(stat_click), 
             'Tot sales ATT': pd.DataFrame().from_dict(stat_tot_sales_att),
             'Share user with sale ATT': pd.DataFrame().from_dict(stat_share_user_sale_att), 
