@@ -66,7 +66,8 @@ class REINFORCE():
         self.rewards = []
     
     def observation_to_log(self,observation, reward):
-        data = self.logged_observation
+        data = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
+                                   'c': [],'r': [],'ps': [], 'ps-a': []}
         
         def _store_organic(observation):
             assert (observation is not None)
@@ -85,7 +86,9 @@ class REINFORCE():
         def _store_clicks(observation,reward):
             assert (observation is not None)
             assert (observation.click is not None)
-            for session in observation.click:
+            # only keep the last bandit event:
+            if len(observation.click)>0:
+                session = observation.click[len(observation.click)-1]
                 data['t'].append(session['t'])
                 data['u'].append(session['u'])
                 data['z'].append('bandit') 
@@ -98,11 +101,12 @@ class REINFORCE():
 
         _store_organic(observation)
         _store_clicks(observation,reward)
-        self.logged_observation = data
         
         # return as dataframe
         df = pd.DataFrame(data)
-        df.sort_values('t')
+        df = df.sort_values('t')
+        df.index = range(len(df))
+        self.logged_observation = df
         return df
     
     def _compute_returns(self, rewards):
@@ -224,5 +228,3 @@ class REINFORCE():
         
     def reset(self):
         self.user_features.reset() 
-        self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
-                                   'c': [],'r': [],'ps': [], 'ps-a': []}

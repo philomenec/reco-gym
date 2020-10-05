@@ -15,22 +15,29 @@ import os
 
 
 # Number of cores
-num_cores = 8
-
+num_cores = 40
 # Number of users for the training
 num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 50
+num_AB_tests = 25
 
 # # tests
+# # Number of cores
+# num_cores = 4
 # # Number of users for the training
 # num_users = 6
 # # Number of users for the A/B test
 # num_users_AB = 7
 # # Number of A/B tests
 # num_AB_tests = 2
+
+#### Configuration !!
+# config_dict = {'cl_mem':{'click':True,'memory':True},
+               # 'nocl_mem':{'click':False,'memory':True}}
+config_dict = {'nocl_mem':{'click':False,'memory':True}}
+names_runs = list(config_dict.keys())
 
 
 
@@ -49,12 +56,9 @@ env_1_sale_args['num_users'] = num_users
 env_1_sale_args['num_users_AB'] = num_users_AB
 
 
-name_run = ''
-
 # Initialize the gym 
 env = gym.make('reco-gym-sale-v1')
 env.init_gym(env_1_sale_args)
-
 
 # Repository to save pickles
 data_repo = os.getcwd()+'/data_conversion/'
@@ -78,47 +82,27 @@ agents[name_agent] = random_agent
 
 
 #### Logs
-print("--- Generate logs ---")
 try:
+    print("--- Load logs ---")
     logs = {name_agent:pd.read_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv')}
 except:
-    
+    print("--- Generate logs ---")
     logs = {name_agent:deepcopy(env).generate_logs(num_users)}
     logs[name_agent].to_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv',index = False)
 
 
-
-# Equal sample weights
-run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                  num_AB_tests, env, agents,data_repo,num_cores,name_run)
-run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                  num_AB_tests, env, agents,data_repo,num_cores,name_run)
-# Sample Weights
-run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                num_AB_tests, env, agents,data_repo,num_cores,name_run)
-run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                num_AB_tests, env, agents,data_repo,num_cores,name_run)
-
-
-
-# def run_tests(test_type,logs=logs,name_agent=name_agent,feature_name=feature_name,
-#               features=features,num_users=num_users,num_users_AB=num_users_AB,
-#                 num_AB_tests=num_AB_tests, env=env, agents=agents,data_repo=data_repo,
-#                 num_cores=int(num_cores/4),name_run=name_run):
-#     if test_type == 'pres':
-#         run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
-#     if test_type == 'presweights':
-#         run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
-#     if test_type == 'prop':
-#         run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
-#     if test_type == 'propweights':
-#         run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-#                   num_AB_tests, env, agents,data_repo,num_cores,name_run)
+for i in range(len(config_dict)):
+    print(f'------------------- Config nb {i}')
+    name_run = names_runs[i]
+    config = config_dict[name_run]
+    # Equal sample weights
+    run_pres_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config)
+    run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+    # Sample Weights
+    run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
+    run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config)
     
-    
-# Parallel(n_jobs=num_cores, verbose=10)(delayed(run_tests)(test_type) 
-#                                               for test_type in ['pres','presweights','prop','propweights'])
-

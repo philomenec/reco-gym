@@ -862,7 +862,7 @@ def build_lookahead_train_data(logs, feature_provider, reward_provider,weights=F
 
 class SaleLikelihoodAgent(Agent):
     def __init__(self, feature_provider, reward_provider, kronecker_features = False, 
-                 look_ahead = False, sample_weight = False, softmax = False,
+                 look_ahead = False, sample_weight = False, softmax = False, memory = False,
                  # multiply_features = False,
                  epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider = feature_provider
@@ -871,6 +871,7 @@ class SaleLikelihoodAgent(Agent):
         self.model = None
         # self.multiply_features = multiply_features
         # self.softmax = softmax
+        self.memory = memory
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
         self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
@@ -993,8 +994,8 @@ class SaleLikelihoodAgent(Agent):
     
     def act(self, observation, reward, done):
         """Act method returns an action based on current observation and past history"""
-        logged_observation = self.observation_to_log(observation)
-        self.feature_provider.observe(logged_observation,memory=False)      
+        logged_observation = self.observation_to_log(observation)    
+        self.feature_provider.observe(logged_observation,memory=self.memory)    
         user_state = self.feature_provider.features()
         if (self.epsilon_greedy == True) & (np.random.rand() < self.epsilon) : 
             print("Explore")
@@ -1033,7 +1034,7 @@ class SaleLikelihoodAgent(Agent):
 class SaleProductLikelihoodAgent(Agent):
     def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, 
                  kronecker_features = False, linear_reg = False, look_ahead = False, 
-                 sample_weight = False, 
+                 sample_weight = False, memory = False,
                  # softmax = False,
                  # multiply_features = False, 
                  epsilon_greedy = False, epsilon = 0.3, seed=43):
@@ -1047,6 +1048,7 @@ class SaleProductLikelihoodAgent(Agent):
         self.kronecker_features = kronecker_features
         self.look_ahead = look_ahead
         self.sample_weight = sample_weight
+        self.memory = memory
         # self.multiply_features = multiply_features
         # self.softmax = softmax
         self.epsilon_greedy = epsilon_greedy
@@ -1221,14 +1223,14 @@ class SaleProductLikelihoodAgent(Agent):
             for i in range(len(self.index_discounted)):
                 ## main (discounted) model 
                 feature_provider = self.feature_provider_list[self.index_discounted[i]]
-                feature_provider.observe(logged_observation,memory=False) 
+                feature_provider.observe(logged_observation,memory=self.memory) 
                 user_state = feature_provider.features()
                 before_discount = self._score_products(user_state, 
                                                        self.models[self.index_discounted[i]])
                 
                 ## model used as discount
                 feature_provider = self.feature_provider_list[self.index_discount[i]]
-                feature_provider.observe(logged_observation,memory=False)      
+                feature_provider.observe(logged_observation,memory=self.memory)  
                 user_state = feature_provider.features()
                 user_state = user_state.reshape(1, -1)
                 if self.models[self.index_discount[i]] is not None :
@@ -1261,7 +1263,7 @@ class SaleProductLikelihoodAgent(Agent):
             
             for i in set(range(self.num_models))-set.union(set(self.index_discount),set(self.index_discounted)):
                 feature_provider = self.feature_provider_list[i]
-                feature_provider.observe(logged_observation,memory=False)      
+                feature_provider.observe(logged_observation,memory=self.memory)  
                 user_state = feature_provider.features()
                 score = score*self._score_products(user_state, self.models[i])
             # if self.softmax == False:
@@ -1300,7 +1302,7 @@ class SaleProductLikelihoodAgent(Agent):
 
 ## Function to train all agents at once
 def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_features=False,
-                 weights=False, repo = 'data/'):
+                 weights=False,  click=True, memory=False, repo = 'data/'):
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1325,49 +1327,70 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
         print("Weights")
         name_extension += 'weights'
     
-    
     # click agent
     print("Click agent")
     likelihood_logreg_click = SaleLikelihoodAgent(feature, Click_rewards,
                                                   kronecker_features = kronecker_features,
-                                                  sample_weight = weights)
+                                                  sample_weight = weights,
+                                                  memory = memory)
     likelihood_logreg_click.train(data)
     info[likelihood_logreg_click.info["Name"]] = likelihood_logreg_click.info
+    if memory:
+        info[likelihood_logreg_click.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_logreg_click"+name_extension] = likelihood_logreg_click
     
     # post display agent
     print("Post display agent")
     likelihood_logreg_postd = SaleLikelihoodAgent(feature, PostDisplay_rewards,
                                                   kronecker_features = kronecker_features,
-                                                  sample_weight = weights)
+                                                  sample_weight = weights,
+                                                  memory=memory)
     likelihood_logreg_postd.train(data)
     info[likelihood_logreg_postd.info["Name"]] = likelihood_logreg_postd.info
+    if memory:
+        info[likelihood_logreg_postd.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_logreg_postd"+name_extension] = likelihood_logreg_postd
         
     # No discount, clicked observations
+    
+    if click :
+        mdp_rew = MDP_rewards
+    else:
+        mdp_rew = MDP_rewards_all
+        
     print("No discount")    
     likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                    reward_provider_list=[Click_rewards,MDP_rewards], 
+                                                    reward_provider_list=[Click_rewards,mdp_rew], 
                                                     discounts=[0,0],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
-                                                  sample_weight = weights)
+                                                    sample_weight = weights,
+                                                    memory=memory)
     likelihood_saleclickprod.train(data)
     info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
+    # if not click:
+    #     print(likelihood_saleclickprod.info["Name"])
+    if memory:
+        info[likelihood_saleclickprod.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
     
       
     # non-specific discount, clicked observations
     print("Discount")    
     likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                    reward_provider_list=[Click_rewards,MDP_rewards,Noclick_rewards_provider], 
+                                                    reward_provider_list=[Click_rewards,mdp_rew,Noclick_rewards_provider], 
                                                     discounts=[0,0,-1],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
-                                                    sample_weight = weights)
+                                                    sample_weight = weights,
+                                                    memory=memory)
     likelihood_saleclickprod_discount.train(data)
     info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
+    # if not click:
+    #     print(likelihood_saleclickprod_discount.info["Name"])
+    #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
+    if memory:
+        info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
     
-   
     pkl.dump([info,save_agents],open(str(repo) + str('agents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
     return info, save_agents
 
@@ -1375,7 +1398,7 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
 
 
 def train_timeagents(name_logging,logs,feature_name,features, num_users, kronecker_features=False, linear_reg=False,
-                     weights=False, repo = 'data/'):
+                     weights=False, click=True, memory = False, repo = 'data/'):
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1403,29 +1426,46 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
         print("Weights")
         name_extension += 'weights'
    
-
+    
+    if click :
+        mdp_rew = MDP_rewards_time
+    else:
+        mdp_rew = MDP_rewards_all_time
+    
     # No discount
     print("No discount")
     likelihood_saleclickprod = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature], 
-                                                    reward_provider_list=[Click_rewards,MDP_rewards_time], 
+                                                    reward_provider_list=[Click_rewards,mdp_rew], 
                                                     discounts=[0,0],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
                                                     linear_reg = linear_reg,
-                                                    sample_weight = weights)
+                                                    sample_weight = weights,
+                                                    memory=memory)
     likelihood_saleclickprod.train(data)
     info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
+    # if not click:
+    #     print(likelihood_saleclickprod.info["Name"])
+    #     # info[likelihood_saleclickprod.info["Name"]]["Name"] += '_all'
+    if memory:
+        info[likelihood_saleclickprod.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
     
     print("Discount")
     # non-specific discount, clicked observations
     likelihood_saleclickprod_discount = SaleProductLikelihoodAgent(feature_provider_list=[feature,feature,feature], 
-                                                    reward_provider_list=[Click_rewards,MDP_rewards_time,Noclick_rewards_provider_time], 
+                                                    reward_provider_list=[Click_rewards,mdp_rew,Noclick_rewards_provider_time], 
                                                     discounts=[0,0,-1],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
                                                     linear_reg = linear_reg,
-                                                    sample_weight = weights)
+                                                    sample_weight = weights,
+                                                    memory=memory)
     likelihood_saleclickprod_discount.train(data)
     info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
+    # if not click:
+    #     print(likelihood_saleclickprod_discount.info["Name"])
+    #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
+    if memory:
+        info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
         
     

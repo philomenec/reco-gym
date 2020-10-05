@@ -32,12 +32,18 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
 
 
 
-def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run,config):
     name_extension = 'pres'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
+    
+    click=True if 'click' not in config.keys() else config['click']
+    memory=False if 'memory' not in config.keys() else config['memory']
+
     info, save_agents = train_agents(name_logging,logs,feature_name,features, num_users=num_users, 
-                                         kronecker_features=True,repo = data_repo)
+                                         kronecker_features=True, weights = False,
+                                         click=click, memory=memory, repo = data_repo)
     print("----------------"+name_extension+"----------------")
     def run_func(i):
         return run_AB_test(i,name_ext=name_extension,env=env,num_users=num_users,num_users_AB=num_users_AB,
@@ -56,12 +62,18 @@ def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_A
     res_true.to_csv(data_repo+"clean/res_true_"+name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension+".csv",index = False)
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
-def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
     name_extension = 'presweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
+    
+    click=True if 'click' not in config.keys() else config['click']
+    memory=False if 'memory' not in config.keys() else config['memory']
+    
     info, save_agents = train_agents(name_logging,logs,feature_name,features, num_users=num_users, 
-                                         kronecker_features=True,weights = True, repo = data_repo)
+                                         kronecker_features=True,weights = True, 
+                                         click=click, memory=memory, repo = data_repo)
     print("----------------"+name_extension+"----------------")
    
     def run_func(i):
@@ -82,12 +94,18 @@ def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
 
-def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
+                      num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
     name_extension = 'prop'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
+    
+    click=True if 'click' not in config.keys() else config['click']
+    memory=False if 'memory' not in config.keys() else config['memory']
+    
     info, save_agents = train_timeagents(name_logging,logs,feature_name,features, num_users=num_users, 
-                                         kronecker_features=True,linear_reg=True, repo = data_repo)
+                                         kronecker_features=True,linear_reg=True, weights = False,
+                                         click=click, memory=memory, repo = data_repo)
     print("----------------"+name_extension+"----------------")
     
     def run_func(i):
@@ -107,12 +125,18 @@ def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_A
     res_true.to_csv(data_repo+"clean/res_true_"+name_logging+str(num_users)+"_"+str(num_users_AB)+"_"+feature_name+name_extension+".csv",index = False)
     return (res_recap, res_recap_latex, res_AB, res_AB_latex, res_true, res_true_latex)
 
-def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,num_AB_tests, env, agents,data_repo,num_cores,name_run=''):
+def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run, config):
     name_extension = 'propweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
+    
+    click=True if 'click' not in config.keys() else config['click']
+    memory=False if 'memory' not in config.keys() else config['memory']
+    
     info, save_agents = train_timeagents(name_logging,logs,feature_name,features, num_users=num_users, 
-                                         kronecker_features=True,linear_reg=True, weights = True, repo = data_repo)
+                                         kronecker_features=True,linear_reg=True, weights = True, 
+                                         click=click, memory=memory, repo = data_repo)
     print("----------------"+name_extension+"----------------")
     
     def run_func(i):

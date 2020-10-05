@@ -41,6 +41,7 @@ class PseudoRewards(FeatureProvider):
     def __init__(self, clicks_only=True):
         self.data_rewards = None
         self.clicks_only = clicks_only
+        self.data = None
         
     def observe(self, data):
             
@@ -59,7 +60,8 @@ class PseudoRewards(FeatureProvider):
     def pseudo_observe(self, data):
             
         data['immediate_sale'] = ((data['c']==1)&(data.shift(-2)["z"]=='sale')&(data.shift(-2)["u"]==data["u"]))*1
-    
+        self.data = data
+        
         # Only keep clicked rows
         if self.clicks_only == True :
             data_clicked = data.loc[data["c"]==1]
@@ -67,13 +69,14 @@ class PseudoRewards(FeatureProvider):
             # Consider unclicked recos as negatives
             data_clicked = data.loc[data["z"]=='bandit']
         data_clicked['pseudo_y'] = data_clicked['r'] - data_clicked['immediate_sale']
-        self.data_rewards = data_clicked[:-2]
+        self.data_rewards = data_clicked
 
     def features(self):
         return self.data_rewards
     
     def reset(self):
         self.data_rewards = None
+        self.data = None
    
     @property
     def name(self):
