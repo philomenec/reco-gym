@@ -14,28 +14,26 @@ import numpy as np
 # #### Settings --- to change!!
 
 
-# # Number of cores
-# num_cores = 40
-# # Number of users for the training
-# num_users = 5000
-# # Number of users for the A/B test
-# num_users_AB = 5000
-# # Number of A/B tests
-# num_AB_tests = 25
-
-# tests
 # Number of cores
-num_cores = 4
+num_cores = 40
 # Number of users for the training
-num_users = 6
+num_users = 5000
 # Number of users for the A/B test
-num_users_AB = 7
+num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 2
+num_AB_tests = 25
+
+# # tests
+# # Number of cores
+# num_cores = 4
+# # Number of users for the training
+# num_users = 6
+# # Number of users for the A/B test
+# num_users_AB = 7
+# # Number of A/B tests
+# num_AB_tests = 2
 
 #### Configuration !!
-config_dict = {'cl_mem':{'click':True,'memory':True},
-               'nocl_mem':{'click':False,'memory':True}}
 config_dict = {'kap'+str(round(kap,1)):{'kappa':round(kap,1)} for kap in np.arange(0.4,1,0.2)}
 names_runs = list(config_dict.keys())
 
