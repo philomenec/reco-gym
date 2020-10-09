@@ -21,7 +21,7 @@ num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 25
+num_AB_tests = 20
 
 # # tests
 # # Number of cores
