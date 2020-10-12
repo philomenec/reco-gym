@@ -34,7 +34,7 @@ num_AB_tests = 20
 # num_AB_tests = 2
 
 #### Configuration !!
-config_dict = {'kap'+str(round(kap,1)):{'kappa':round(kap,1)} for kap in [0.4,0.6,0.8,0.5]}
+config_dict = {'kap'+str(round(kap,1)):{'kappa':round(kap,1)} for kap in [0.6,0.8]}
 names_runs = list(config_dict.keys())
 
 
@@ -99,9 +99,10 @@ for i in range(len(config_dict)):
                       num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save=False)
     run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
                       num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-    # Sample Weights
-    run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-    run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+    if i > 0:
+        # Sample Weights
+        run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                        num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+        run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                        num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     
