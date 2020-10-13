@@ -220,13 +220,9 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.update_state()
 
         if click == 1:
-            if self.config.p_bounce < self.rng.rand():
-                self.state = organic  # After a click, Organic Events always follow.
-                self.update_user_feature(action_id) ##H # Update user feature based on reco
-                initial_product = action_id
-            else:
-                # print('bounce')
-                self.state = bandit
+            self.state = organic  # After a click, Organic Events always follow.
+            self.update_user_feature(action_id) ##H # Update user feature based on reco
+            initial_product = action_id
             
         else :
             initial_product = None

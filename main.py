@@ -21,7 +21,7 @@ num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 20
+num_AB_tests = 25
 
 # # tests
 # # Number of cores
@@ -34,7 +34,7 @@ num_AB_tests = 20
 # num_AB_tests = 2
 
 #### Configuration !!
-config_dict = {'kap'+str(round(kap,1)):{'kappa':round(kap,1)} for kap in [0.6,0.8]}
+config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.1,0,0.2]}
 names_runs = list(config_dict.keys())
 
 
@@ -45,10 +45,8 @@ data_repo = os.getcwd()+'/data_conversion/'
 
 ## Loop over configurations
 for i in range(len(config_dict)):
-    print(f'------------------- Config nb {i}')
+    print('---------------------------Run nb'+str(i))
     name_run = names_runs[i]
-    
-    ################### Initialise environment
     env_1_sale_args['random_seed'] = 0
     env_1_sale_args['num_products'] = 10
     env_1_sale_args['number_of_flips'] = 10 
@@ -57,9 +55,11 @@ for i in range(len(config_dict)):
     print('Number of flips =',env_1_sale_args['number_of_flips'])
     nb_flips = env_1_sale_args['number_of_flips']
     env_1_sale_args['mu_sale'] = False 
-    if 'kap' in name_run:
-        env_1_sale_args['kappa'] = config_dict[name_run]['kappa']
+    env_1_sale_args['kappa'] = 0.6
     print('Value of kappa =',env_1_sale_args['kappa'])
+    if 'pbounce' in name_run:
+        env_1_sale_args['p_bounce'] = config_dict[name_run]['pbounce']
+        print('pbounce=',env_1_sale_args['p_bounce'])
     env_1_sale_args['num_users'] = num_users
     env_1_sale_args['num_users_AB'] = num_users_AB
 
@@ -99,10 +99,9 @@ for i in range(len(config_dict)):
                       num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save=False)
     run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
                       num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-    if i > 0:
-        # Sample Weights
-        run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                        num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-        run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-                        num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+    # Sample Weights
+    run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+    run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     
