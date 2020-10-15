@@ -34,7 +34,7 @@ num_AB_tests = 25
 # num_AB_tests = 2
 
 #### Configuration !!
-config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.1,0,0.2]}
+config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0,0.2,0.1]}
 names_runs = list(config_dict.keys())
 
 
