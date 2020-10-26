@@ -106,9 +106,9 @@ for i in range(len(config_dict)):
                       num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save=False)
     run_prop_noweight(logs,name_agent,feature_name,features,num_users,num_users_AB,
                       num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-    # # Sample Weights
-    # run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-    #                 num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
-    # run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
-    #                 num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+    # Sample Weights
+    run_pres_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
+    run_prop_weight(logs,name_agent,feature_name,features,num_users,num_users_AB,
+                    num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save=False)
     
