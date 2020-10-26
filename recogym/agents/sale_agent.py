@@ -23,6 +23,10 @@ from scipy.special import logit
 import pickle as pkl
 from IPython.display import display
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score, 
+                             precision_score, recall_score)
+from sklearn.metrics import (explained_variance_score,max_error,mean_absolute_error,
+                             mean_squared_error,r2_score)
 
 
 class FracLogisticRegression(LinearRegression):
@@ -880,6 +884,7 @@ class SaleLikelihoodAgent(Agent):
         self.look_ahead = look_ahead
         self.sample_weight = sample_weight
         self.report_issue = {}
+        self.performance_models = None
         
     @property
     def num_products(self):
@@ -931,6 +936,47 @@ class SaleLikelihoodAgent(Agent):
         
         self.model = LogisticRegression(solver='lbfgs', max_iter=5000)
         self.model.fit(features, rewards, sample_weight=weights)
+        
+        
+    def evaluate_model(self, logs):
+        if self.look_ahead == False:
+            user_states, actions, rewards, proba_actions, self.info = build_train_data(logs, 
+                                                                            self.feature_provider, 
+                                                                            self.reward_provider,
+                                                                            weights = self.sample_weight)
+            weights = np.array(self.info["weights"]) if self.sample_weight == True else None
+
+        else:
+            user_states, actions, rewards, proba_actions, self.info = build_lookahead_train_data(logs, 
+                                                                            self.feature_provider, 
+                                                                            self.reward_provider)
+            weights = None
+            
+        rewards = (rewards > 0)*1
+        # self.cr = sum(rewards)/len(rewards)
+        
+        if self.kronecker_features == False:
+            actions_onehot = np.zeros((len(actions), self.num_products))
+            actions_onehot[np.arange(len(actions)),actions] = 1
+            features = np.hstack([
+                user_states,
+                actions_onehot
+            ])
+        else :
+            features = np.array([self._create_features_kronecker(user_states[i],
+                                                                    actions[i]) 
+                                         for i in range(len(actions))])
+        
+        model = self.model
+        pred_label = model.predict(features)
+        performance = {'accuracy':accuracy_score(y_true=rewards,y_pred=pred_label),
+                        'bal_accuracy':balanced_accuracy_score(y_true=rewards,y_pred=pred_label),
+                        'f1':f1_score(y_true=rewards,y_pred=pred_label),
+                        'recall':recall_score(y_true=rewards,y_pred=pred_label),
+                        'precision':precision_score(y_true=rewards,y_pred=pred_label)}
+        self.performance_models = performance 
+        return self.performance_models
+        
         
     
     def _score_products(self, user_state):
@@ -1064,6 +1110,7 @@ class SaleProductLikelihoodAgent(Agent):
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
         self.linear_reg = linear_reg #whether to use a linear regression if labels are non-binary
         self.report_issue = {'discounts':[]}
+        self.performance_models = None
         
     @property
     def num_products(self):
@@ -1142,12 +1189,92 @@ class SaleProductLikelihoodAgent(Agent):
                     model = LogisticRegression(solver='lbfgs', max_iter=5000)
                     model.fit(features, rewards, sample_weight=weights)
                 else: 
-                    model = FracLogisticRegression()
-                    model.fit(features, rewards, sample_weight=weights)
+                    # print('linear reg',self.linear_reg)
+                    if self.linear_reg[i]==True:
+                        model = FracLogisticRegression()
+                        model.fit(features, rewards, sample_weight=weights)
+                    else:
+                        model = LogisticRegression(solver='lbfgs', max_iter=5000)
+                        model.fit(features, rewards, sample_weight=weights)
             else :
                 model = None
                 
             self.models.append(model)
+    
+    def evaluate_models(self,logs):
+        self.performance_models = []
+        name_models = self.info['Name'].strip('_all').split('Provider_')
+        for i in range(len(self.models)):
+            print('--- Evaluate model : ',name_models[i])
+            feature_provider = self.feature_provider_list[i]
+            reward_provider = self.reward_provider_list[i]
+            
+            if (self.look_ahead == False):
+                user_states, actions, rewards, proba_actions, info = build_train_data(logs, 
+                                                                                feature_provider, 
+                                                                                reward_provider,
+                                                                                weights = self.sample_weight)
+                weights = np.array(info["weights"]) if (self.sample_weight == True) & (self.discounts[i] == 0) else None
+    
+            else:
+                user_states, actions, rewards, proba_actions, info = build_lookahead_train_data(logs, 
+                                                                                feature_provider, 
+                                                                                reward_provider)
+                weights = None
+            
+            # Convert rewards to binary rewards (just in case of multiple sales)
+            if np.max(rewards) > 1 : 
+                rewards = (rewards > 0)*1
+            
+            # Build features 
+            if (self.discounts[i] == 0) or self.discounts_with_action :
+                # Include action         
+                if self.kronecker_features == False:   
+                    actions_onehot = np.zeros((len(actions), self.num_products))
+                    actions_onehot[np.arange(len(actions)),actions] = 1
+                    
+                    features = np.hstack([
+                        user_states,
+                        actions_onehot
+                    ])
+                else :
+                    features = np.array([self._create_features_kronecker(user_states[i],
+                                                                    actions[i]) 
+                                         for i in range(len(actions))])
+                
+            else :
+                # Models used as discounts don't use actions
+                features = user_states
+                    
+                
+            # Fit logistic regression and save model
+            if len(features) > 0 :
+                model = self.models[i]
+                pred_label = model.predict(features)
+                # print('predicted label:',pred_label)
+                try:
+                    performance = {'Name':name_models[i],
+                                   'accuracy':accuracy_score(y_true=rewards,y_pred=pred_label),
+                                   'bal_accuracy':balanced_accuracy_score(y_true=rewards,y_pred=pred_label),
+                                   'f1':f1_score(y_true=rewards,y_pred=pred_label),
+                                   'recall':recall_score(y_true=rewards,y_pred=pred_label),
+                                   'precision':precision_score(y_true=rewards,y_pred=pred_label)}
+                except:
+                    clipped_proportion = np.clip(np.array(rewards),a_min=1e-10,a_max =1-1e-10)
+                    true_label = logit(clipped_proportion)
+                    performance = {'Name':name_models[i],
+                                   'explained_variance':explained_variance_score(y_true=true_label,y_pred=pred_label),
+                                   'max_error':max_error(y_true=true_label,y_pred=pred_label),
+                                   'mean_absolute_error':mean_absolute_error(y_true=true_label,y_pred=pred_label),
+                                   'mean_squared_error':mean_squared_error(y_true=true_label,y_pred=pred_label),
+                                   'r2_score':r2_score(y_true=true_label,y_pred=pred_label)}
+
+            else :
+                performance = None
+
+            self.performance_models.append(performance)
+            
+        return self.performance_models
     
     def _score_products(self, user_state, model):
         
@@ -1387,11 +1514,18 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
     # if not click:
     #     print(likelihood_saleclickprod_discount.info["Name"])
     #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
+    
+    # Evaluate the submodels
+    print('----- Evaluate submodels')
+    data_test = logs[name_logging+'_test']
+    performance = likelihood_saleclickprod_discount.evaluate_models(data_test)
+    # print(likelihood_saleclickprod_discount.performance_models)
+    
     if memory:
         info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
     
-    pkl.dump([info,save_agents],open(str(repo) + str('agents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
+    pkl.dump([info,save_agents,performance],open(str(repo) + str('agents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
     return info, save_agents
 
 
@@ -1438,7 +1572,7 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
                                                     reward_provider_list=[Click_rewards,mdp_rew], 
                                                     discounts=[0,0],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
-                                                    linear_reg = linear_reg,
+                                                    linear_reg = [False,linear_reg],
                                                     sample_weight = weights,
                                                     memory=memory)
     likelihood_saleclickprod.train(data)
@@ -1456,7 +1590,7 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
                                                     reward_provider_list=[Click_rewards,mdp_rew,Noclick_rewards_provider_time], 
                                                     discounts=[0,0,-1],discounts_with_action=False,
                                                     kronecker_features = kronecker_features,
-                                                    linear_reg = linear_reg,
+                                                    linear_reg = [False,linear_reg,linear_reg],
                                                     sample_weight = weights,
                                                     memory=memory)
     likelihood_saleclickprod_discount.train(data)
@@ -1464,13 +1598,21 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
     # if not click:
     #     print(likelihood_saleclickprod_discount.info["Name"])
     #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
+    
+    
+    # Evaluate the submodels
+    print('----- Evaluate submodels')
+    data_test = logs[name_logging+'_test']
+    performance = likelihood_saleclickprod_discount.evaluate_models(data_test)
+    print(likelihood_saleclickprod_discount.performance_models)
+    
     if memory:
         info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod_discount"+name_extension] = likelihood_saleclickprod_discount
         
     
     try:
-        pkl.dump([info,save_agents],open(str(repo)+str('timeagents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
+        pkl.dump([info,save_agents,performance],open(str(repo)+str('timeagents'+str(num_users)+name_logging+feature_name+name_extension+'.pkl'),'wb'))
     except:
         print(" //!!\\ Error when saving agents")
     return info, save_agents
