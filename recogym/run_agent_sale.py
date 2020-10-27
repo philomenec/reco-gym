@@ -35,6 +35,22 @@ def run_AB_test(i,name_ext,env,num_users,num_users_AB,agents,save_agents,name_lo
 
 def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
                       num_AB_tests, env, agents,data_repo,num_cores,name_run,config,save):
+    ''' Function to run a given number of A/B tests, where agents optimise 
+    for the presence of sale with equal sample weights
+    Inputs:
+        - log: logging data
+        - name_agent: agent name
+        - feature_name: feature name
+        - features: class with feature provider
+        - num_users: number of users for the training
+        - num_users_AB: number of users for each A/B test
+        - num_AB_tests: number of A/B tests
+        - env: environment(recogym)
+        - agents: dictionnary of agents to run
+        - data_repo : repository
+        - num_cores: number of cores to use
+        - config: configuration
+        - save: whether to save all results or only a sum up'''
     name_extension = 'pres'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -70,6 +86,22 @@ def run_pres_noweight(log,name_agent,feature_name,features,num_users,num_users_A
 
 def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
                     num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
+     ''' Function to run a given number of A/B tests, where agents optimise 
+     for the presence of sale with VARYING sample weights (inverse variance of user features)
+    Inputs:
+        - log: logging data
+        - name_agent: agent name
+        - feature_name: feature name
+        - features: class with feature provider
+        - num_users: number of users for the training
+        - num_users_AB: number of users for each A/B test
+        - num_AB_tests: number of A/B tests
+        - env: environment(recogym)
+        - agents: dictionnary of agents to run
+        - data_repo : repository
+        - num_cores: number of cores to use
+        - config: configuration
+        - save: whether to save all results or only a sum up'''
     name_extension = 'presweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -107,6 +139,22 @@ def run_pres_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
 
 def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_AB,
                       num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
+     ''' Function to run a given number of A/B tests, where agents optimise for 
+     the PROPORTION of sale with equal sample weights
+    Inputs:
+        - log: logging data
+        - name_agent: agent name
+        - feature_name: feature name
+        - features: class with feature provider
+        - num_users: number of users for the training
+        - num_users_AB: number of users for each A/B test
+        - num_AB_tests: number of A/B tests
+        - env: environment(recogym)
+        - agents: dictionnary of agents to run
+        - data_repo : repository
+        - num_cores: number of cores to use
+        - config: configuration
+        - save: whether to save all results or only a sum up'''
     name_extension = 'prop'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)
@@ -143,6 +191,22 @@ def run_prop_noweight(log,name_agent,feature_name,features,num_users,num_users_A
 
 def run_prop_weight(log,name_agent,feature_name,features,num_users,num_users_AB,
                     num_AB_tests, env, agents,data_repo,num_cores,name_run, config,save):
+     ''' Function to run a given number of A/B tests, where agents optimise for 
+     the PROPORTION of sale with VARYING sample weights (inverse of the variance of user features)
+    Inputs:
+        - log: logging data
+        - name_agent: agent name
+        - feature_name: feature name
+        - features: class with feature provider
+        - num_users: number of users for the training
+        - num_users_AB: number of users for each A/B test
+        - num_AB_tests: number of A/B tests
+        - env: environment(recogym)
+        - agents: dictionnary of agents to run
+        - data_repo : repository
+        - num_cores: number of cores to use
+        - config: configuration
+        - save: whether to save all results or only a sum up'''
     name_extension = 'propweights'+str(name_run)
     name_logging = name_agent
     logs = deepcopy(log)

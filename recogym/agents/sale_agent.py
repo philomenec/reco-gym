@@ -1,36 +1,24 @@
 import numpy as np
-# from numba import njit
 from numpy.random.mtrand import RandomState
-from sklearn.linear_model import LogisticRegression
-# import pandas as pd
-# from copy import deepcopy
-# from scipy.stats.distributions import beta
-# import matplotlib.pyplot as plt
-# import torch
-# import torch.nn.functional as F
-# from torch.autograd import Variable
-# from recogym.util import FullBatchLBFGS
 import pandas as pd
-
-# from ..envs.configuration import Configuration
-from ..envs.reco_env_v1_sale import sig
-# from ..envs.reco_env_v1_sale import env_1_args, ff, sig
-from recogym.agents.abstract import Agent
-# from recogym.envs.reco_env_v1_sale import RecoEnv1Sale
-
-from recogym.agents import FeatureProvider
 from scipy.special import logit
 import pickle as pkl
 from IPython.display import display
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score, 
                              precision_score, recall_score)
 from sklearn.metrics import (explained_variance_score,max_error,mean_absolute_error,
                              mean_squared_error,r2_score)
-
+from ..envs.reco_env_v1_sale import sig
+from recogym.agents.abstract import Agent
+from recogym.agents import FeatureProvider
 
 class FracLogisticRegression(LinearRegression):
-
+    ''' Apply a linear regression to a fraction by applying a logit first
+            - x: features
+            - p: proportion
+            - sample_weight: observation weights for the fit'''
     def fit(self, x, p, sample_weight):
         p = np.clip(np.array(p),a_min=1e-10,a_max =1-1e-10)
         y = logit(p)
@@ -43,7 +31,6 @@ class FracLogisticRegression(LinearRegression):
     def predict_proba(self, x):
         y = super().predict(x)
         p = 1 / (np.exp(-y) + 1)
-        # print(p)
         return p
 
 
@@ -58,19 +45,19 @@ class FracLogisticRegression(LinearRegression):
 ## (1) Attribute click boolean as reward
 
 class ClickRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class : reward of 1 if there is a click"""
 
     def __init__(self, clicks_only=False):
         self.data_rewards = None
         self.clicks_only = clicks_only
         
     def observe(self, data):
+        ## Attribute the rewards given the dataset
         # Consider unclicked recos as negatives
         data_clicked = data.loc[data["z"]=='bandit']
             
-        # Set target as MDP reward
+        # Set target as click
         data_clicked["y"] = data_clicked["c"]
-
         self.data_rewards = data_clicked
 
     def features(self):
@@ -88,7 +75,9 @@ class ClickRewardProvider(FeatureProvider):
 
 
 class NoclickRewardProdivder(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class: reward post non click
+       Attribute a reward if there is a sale in the organic session following 
+       an absence of click (spontaneous transition of the user)"""
 
     def __init__(self, organic_only=False, normalize=False):
         self.data_rewards = None
@@ -96,7 +85,7 @@ class NoclickRewardProdivder(FeatureProvider):
         self.normalize = normalize
         
     def observe(self, data):
-        
+        ## Attribute the rewards given the dataset
         if self.organic_only :
             # Only keep data before first clicked reco 
             pure_organic_df = data[:0].copy()
@@ -159,18 +148,18 @@ class NoclickRewardProdivder(FeatureProvider):
 
 
 
-## (2) attribute the reward of the MDP
+## Attribute the reward of the MDP/RecoGym simulator
 class MDPRewardProvider(FeatureProvider):
     """Reward shaping class"""
 
     def __init__(self, clicks_only=True, organic_only=False, normalize=False):
-        self.data_rewards = None
-        self.clicks_only = clicks_only
-        self.organic_only = organic_only
+        self.data_rewards = None #final dataset
+        self.clicks_only = clicks_only #only keep clicked data
+        self.organic_only = organic_only #organic data only (before the 1st click)
         self.normalize = normalize
         
     def observe(self, data):
-        
+        ## Attribute the rewards given the dataset
         if self.organic_only :
             # Only keep data before first clicked reco 
             pure_organic_df = data[:0].copy()
@@ -189,20 +178,6 @@ class MDPRewardProvider(FeatureProvider):
             data["a"] = data["v"]
             # remove organic events followed by a sale to avoid double counting
             data = data.loc[data.shift(-1)["z"]!="sale"]
-            
-            # if self.normalize : 
-            #     # group by user and views
-            #     user_views_counts = data.groupby(["u","v"]).count()
-            #     # keep track of (user,view) pair and counts
-            #     indices = np.array(user_views_counts.index)
-            #     counts = np.array(user_views_counts["t"])
-            #     # initialise a matrix of per user-action counts (also with views that never appeared)
-            #     user_views_counts = np.zeros((len(data["u"].unique()),1+np.max([indices[i][1] for i in range(len(indices))])))
-            #     user_views_counts[tuple(zip(*indices))] = counts
-            #     # divide the reward by the number of "trials" of user u with product a
-            #     denominator = user_views_counts[np.array(data["u"][data["y"]>0]).astype(int),np.array(data["v"][data["y"]>0]).astype(int)]
-            #     data["y"][data["y"]>0] = data["y"][data["y"]>0]/denominator
-            
             self.data_rewards = data
         
         else :
@@ -256,9 +231,10 @@ class MDPRewardProvider(FeatureProvider):
         return name
        
     
-## (3) : Only attribute reward if any product is sold before the next clicked recommendation
+## Only attribute reward if any product is sold before the next clicked recommendation
 class NonPersoShortTermRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class:
+        Only attribute reward if any product is sold before the next clicked recommendation"""
 
     def __init__(self, clicks_only=True, organic_only=False):
         self.data_rewards = None
@@ -266,7 +242,7 @@ class NonPersoShortTermRewardProvider(FeatureProvider):
         self.organic_only = organic_only
         
     def observe(self, data):
-        
+        ## Attribute the rewards given the dataset
         if self.organic_only :
             # Only keep data before first clicked reco 
             pure_organic_df = data[:0].copy()
@@ -332,9 +308,10 @@ class NonPersoShortTermRewardProvider(FeatureProvider):
     
     
     
-## (4) : Only attribute reward if the recommended product is sold before the next clicked recommendation
+## Only attribute reward if the recommended product is sold before the next clicked recommendation
 class ShortTermRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class:
+        Only attribute reward if the recommended product is sold before the next clicked recommendation"""
 
     def __init__(self, clicks_only=True, organic_only=False):
         self.data_rewards = None
@@ -342,7 +319,7 @@ class ShortTermRewardProvider(FeatureProvider):
         self.organic_only = organic_only
         
     def observe(self, data):
-        
+        ## Attribute the rewards given the dataset
         if self.organic_only :
             # Only keep data before first clicked reco 
             pure_organic_df = data[:0].copy()
@@ -406,16 +383,18 @@ class ShortTermRewardProvider(FeatureProvider):
             name += "_pureorganic"
         return name
 
-## (5) Attribute a reward if the product was sold later at one point during the user session
+## Attribute a reward if the product was sold later at one point during the user session
 class CumulativeRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class:
+        Attribute a reward if the product was sold later at one point during the user session
+        (before the end of the episode)"""
     
     def __init__(self, clicks_only=True):
         self.data_rewards = None
         self.clicks_only = clicks_only
 
     def observe(self, data):
-        # from tqdm import tqdm
+        ## Attribute the rewards given the dataset
         
         # Only keep clicked rows
         if self.clicks_only == True :
@@ -460,7 +439,9 @@ class CumulativeRewardProvider(FeatureProvider):
 
 ### Post display sales
 class PostDisplayRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class:
+        Post display sales: attribute a reward if a view (considered as an action)
+        is followed by a sale for the viewed product"""
 
     def __init__(self,normalize=False):
         self.data_rewards = None
@@ -492,7 +473,8 @@ class PostDisplayRewardProvider(FeatureProvider):
 
 
 class DifferenceRewardProvider(FeatureProvider):
-    """Reward shaping class"""
+    """Reward shaping class:
+        Return the difference between 2 reward attribution schemes"""
 
     def __init__(self,RewardProvider1, RewardProvider2, normalize=False):
         self.RewardProvider1 = RewardProvider1
@@ -546,7 +528,7 @@ class DifferenceRewardProvider(FeatureProvider):
 
 class CountViewsFeatureProvider(FeatureProvider):
     """Feature provider as an abstract class that defines interface of setting/getting features
-    The class counts both clicks and views """
+    The class counts views for each product"""
 
     def __init__(self, config):
         super(CountViewsFeatureProvider, self).__init__(config)
@@ -554,6 +536,7 @@ class CountViewsFeatureProvider(FeatureProvider):
         self.user_features = np.zeros(self.num_products)
         
     def observe(self, data):
+        # Build features
         if type(data) == pd.core.series.Series:
             if data["z"]=="organic":
                 views = [(data["v"]==p)*1 for p in range(self.num_products)]
@@ -587,7 +570,7 @@ class CountViewsFeatureProvider(FeatureProvider):
 ## Consider share of views instead of counts
 class ShareViewsFeatureProvider(FeatureProvider):
     """Feature provider as an abstract class that defines interface of setting/getting features
-    The class counts both clicks and views """
+    The class derives shares of views for each product"""
 
     def __init__(self, config):
         super(ShareViewsFeatureProvider, self).__init__(config)
@@ -596,6 +579,7 @@ class ShareViewsFeatureProvider(FeatureProvider):
         self.user_features = np.zeros(self.num_products)
         
     def observe(self, data, memory = True):
+        # Build features
         if type(data) == pd.core.series.Series:
             if data["z"]=="organic":
                 views = [(data["v"]==p)*1 for p in range(self.num_products)]
@@ -647,6 +631,7 @@ class CountViewsClicksFeatureProvider(FeatureProvider):
         self.user_features = np.zeros(2*self.num_products)
         
     def observe(self, data):
+        # Build features
         if type(data) == pd.core.series.Series:
             row = data
             if row["z"]=='organic':
@@ -688,7 +673,7 @@ class CountViewsClicksFeatureProvider(FeatureProvider):
     
 class ShareViewsClicksFeatureProvider(FeatureProvider):
     """Feature provider as an abstract class that defines interface of setting/getting features
-    The class counts both clicks and views """
+    The class derives shares of both clicks and views """
 
     def __init__(self, config):
         super(ShareViewsClicksFeatureProvider, self).__init__(config)
@@ -700,6 +685,7 @@ class ShareViewsClicksFeatureProvider(FeatureProvider):
         self.user_features = np.zeros(2*self.num_products)
         
     def observe(self, data):
+        # Build features
         if type(data) == pd.core.series.Series:
             row = data
             if row["z"]=='organic':
@@ -753,6 +739,14 @@ class ShareViewsClicksFeatureProvider(FeatureProvider):
 ################################################################
 
 def info_reward_provider(data,featured_data, name, share_sales=True):
+    '''Function used to provide information about the data
+    Inputs:
+    - data: entire data (before preprocessing)
+    - featured_data: data after preprocessing and label/feature definition
+    - name: name of the reward provider
+    - share_sales: whether to return the share of sales (not always defined)
+    Outputs:
+        a dictionary of infos'''
     dict_info = {'Name':name,
                 'Total length data':len(data),
                  'Total length trainset':len(featured_data)}
@@ -762,12 +756,24 @@ def info_reward_provider(data,featured_data, name, share_sales=True):
 
 
 def build_train_data(logs, feature_provider, reward_provider, weights=False):
+    '''Function to build training data based on logs, feature provider and reward provider
+    --> user features are built sequentially based on available data only (like at test time)
+    Inputs:
+    - logs: logging data
+    - feature_provider: a class returning some features
+    - rewards provider: a class returning the rewards
+    - weights: whether to include sample weights
+    Outputs:
+        a tuple of user states, actions, labels, propensity scores, informations'''
+    
+    # User features
     user_states = []
     
     # Define clicked logs
     reward_provider.observe(logs)
     train_log = reward_provider.features()
     
+    # Extract information
     if sum([subtext in reward_provider.name.lower() for subtext in ('click','pure','postdisplay')])==0:
         info = info_reward_provider(logs,train_log, reward_provider.name, share_sales=True)
     else :
@@ -792,7 +798,6 @@ def build_train_data(logs, feature_provider, reward_provider, weights=False):
             feature_provider.reset()
             if weights == True:
                 weights_list.append([])
-                # info["weights"].append([])
             
         feature_provider.observe(row)
         feature_sum = feature_provider.features()
@@ -803,17 +808,8 @@ def build_train_data(logs, feature_provider, reward_provider, weights=False):
             
             if weights == True:
                 weights_list[len(weights_list)-1].append(feature_provider.weight)
-                # info["weights"][len(weights_list)-1].append(np.sqrt(np.sum(weights_list[len(weights_list)-1])))
-                # info["weights"].append(np.sqrt(np.sum(weights_list[len(weights_list)-1])))
-                # avg_product_variance = np.mean([p*(1-p) for p in feature_sum])
-                # assert ((avg_product_variance >= 0) and (avg_product_variance <= 1))
-                # info["weights"].append(np.sum(weights_list[len(weights_list)-1])/(avg_product_variance+1e-2))
                 info["weights"].append(np.sum(weights_list[len(weights_list)-1]))
         
-        # if weights == True:
-        #     # Flatten the list and turn it into a numpy array
-        #     info["weights"] = np.array([i for user_sublist in info["weights"] for i in user_sublist])
-    
     return (np.array(user_states), 
             np.array(train_log["a"]).astype(int), 
             np.array(train_log["y"].astype(int)), 
@@ -822,6 +818,17 @@ def build_train_data(logs, feature_provider, reward_provider, weights=False):
 
 
 def build_lookahead_train_data(logs, feature_provider, reward_provider,weights=False):
+    '''Function to build training data based on logs, feature provider and reward provider
+    --> user features are CONSTANT over the episode. They are built by "looking ahead"
+        ie by taking into account future information (not possible at test time)
+    Inputs:
+    - logs: logging data
+    - feature_provider: a class returning some features
+    - rewards provider: a class returning the rewards
+    - weights: whether to include sample weights
+    Outputs:
+        a tuple of user states, actions, labels, propensity scores, informations'''
+    # User features
     user_states = []
 
     # Define clicked logs
@@ -861,10 +868,17 @@ def build_lookahead_train_data(logs, feature_provider, reward_provider,weights=F
 
 
 
-
-
-
 class SaleLikelihoodAgent(Agent):
+    '''Class defining an agent which optimises a logistic regression given some reward and feature provider
+    Inputs:
+        - a feature provider class
+        - a reward provider class
+        - kronecker_features: whether to include interaction terms between user/products
+        - look_ahead: whether to use constant user features by looking at the future for the training
+        - sample_weight: whether to user an inverse variance (of the user features) sample weight
+        - softmax: whether to sample from the policy (instead of taking the argmax)
+        - memory: used for features
+        - epsilong_greedy: whether to apply exploration, with parameter epsilon'''
     def __init__(self, feature_provider, reward_provider, kronecker_features = False, 
                  look_ahead = False, sample_weight = False, softmax = False, memory = False,
                  # multiply_features = False,
@@ -872,18 +886,18 @@ class SaleLikelihoodAgent(Agent):
         self.feature_provider = feature_provider
         self.reward_provider = reward_provider
         self.random_state = RandomState(seed)
-        self.model = None
-        # self.multiply_features = multiply_features
-        # self.softmax = softmax
+        self.model = None #keep track of the (fitted) model
         self.memory = memory
         self.epsilon_greedy = epsilon_greedy
         self.epsilon = epsilon
+        # initialise dictionnary to save logged observations:
         self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
         self.kronecker_features = kronecker_features
         self.look_ahead = look_ahead
         self.sample_weight = sample_weight
         self.report_issue = {}
+        # keep track of the model performance:
         self.performance_models = None
         
     @property
@@ -906,6 +920,8 @@ class SaleLikelihoodAgent(Agent):
         return features
     
     def train(self, logs):
+        '''Train the agent'''
+        # Get features, actions, rewards, and propensities
         if self.look_ahead == False:
             user_states, actions, rewards, proba_actions, self.info = build_train_data(logs, 
                                                                             self.feature_provider, 
@@ -919,9 +935,10 @@ class SaleLikelihoodAgent(Agent):
                                                                             self.reward_provider)
             weights = None
             
+        # Binary rewards
         rewards = (rewards > 0)*1
-        # self.cr = sum(rewards)/len(rewards)
         
+        # Define interaction 
         if self.kronecker_features == False:
             actions_onehot = np.zeros((len(actions), self.num_products))
             actions_onehot[np.arange(len(actions)),actions] = 1
@@ -934,11 +951,14 @@ class SaleLikelihoodAgent(Agent):
                                                                     actions[i]) 
                                          for i in range(len(actions))])
         
+        # Fit logistic regression
         self.model = LogisticRegression(solver='lbfgs', max_iter=5000)
         self.model.fit(features, rewards, sample_weight=weights)
         
         
     def evaluate_model(self, logs):
+        '''Evaluate the submodel with classification metrics''''
+        # Get features, actions, rewards, and propensities
         if self.look_ahead == False:
             user_states, actions, rewards, proba_actions, self.info = build_train_data(logs, 
                                                                             self.feature_provider, 
@@ -952,9 +972,10 @@ class SaleLikelihoodAgent(Agent):
                                                                             self.reward_provider)
             weights = None
             
+        # Binary rewards
         rewards = (rewards > 0)*1
-        # self.cr = sum(rewards)/len(rewards)
         
+        # Define interaction 
         if self.kronecker_features == False:
             actions_onehot = np.zeros((len(actions), self.num_products))
             actions_onehot[np.arange(len(actions)),actions] = 1
@@ -967,6 +988,7 @@ class SaleLikelihoodAgent(Agent):
                                                                     actions[i]) 
                                          for i in range(len(actions))])
         
+        # Test the model
         model = self.model
         pred_label = model.predict(features)
         performance = {'accuracy':accuracy_score(y_true=rewards,y_pred=pred_label),
@@ -980,6 +1002,7 @@ class SaleLikelihoodAgent(Agent):
         
     
     def _score_products(self, user_state):
+        # Predict reward for each product given the user state
         if self.kronecker_features == False:
             all_action_features = np.array([self._create_features(user_state,action)
                                             for action in range(self.num_products)])
@@ -990,14 +1013,10 @@ class SaleLikelihoodAgent(Agent):
             score = self.model.predict_proba(all_action_features)[:, 1]
         except:
             score = self.model.predict_proba(all_action_features)
-        # if self.multiply_features:
-        #     try : 
-        #         score = score * np.array(user_state)
-        #     except Exception as e: 
-        #         print(e)
         return score
     
     def observation_to_log(self,observation):
+        '''Transform simulator observation into a log''''
         data = self.logged_observation
         
         def _store_organic(observation):
@@ -1040,21 +1059,17 @@ class SaleLikelihoodAgent(Agent):
     
     def act(self, observation, reward, done):
         """Act method returns an action based on current observation and past history"""
-        logged_observation = self.observation_to_log(observation)    
+        # Transform observation to log
+        logged_observation = self.observation_to_log(observation)  
+        # Observe user features
         self.feature_provider.observe(logged_observation,memory=self.memory)    
         user_state = self.feature_provider.features()
+        # Select action
         if (self.epsilon_greedy == True) & (np.random.rand() < self.epsilon) : 
-            print("Explore")
             action = np.random.randint(self.num_products())
-        # elif self.softmax :
-        #     score = self._score_products(user_state)
-        #     action = self.random_state.choice(
-        #             self.config.num_products,
-        #             p=score/np.sum(score)
-        #         )
         else :
             action = np.argmax(self._score_products(user_state))
-        
+        # return action and propensity
         ps = 1.0
         all_ps = np.zeros(self.num_products)
         all_ps[action] = 1.0        
@@ -1072,17 +1087,37 @@ class SaleLikelihoodAgent(Agent):
         }
 
     def reset(self):
+        ''' Reset user features and logged observation (after each user)'''
         self.feature_provider.reset() 
         self.logged_observation = {'t': [],'u': [], 'z': [],'v': [], 'a': [],
                                    'c': [],'r': [],'ps': [], 'ps-a': []}
 
 
 class SaleProductLikelihoodAgent(Agent):
+    '''Class defining an agent which optimises a product of logistic regressions,
+    eventually with discounts, given some lists of reward and feature provider
+    Inputs:
+        - feature_provider_list: a list of feature provider classes
+        - reward_provider_list: a list of reward provider classes
+        - discounts: list to indicate which agent discounts which other agent.
+        the list is of same length as the feature and reward provider lists
+        eg: discounts = [0,0,-1] means that the agent nb2 is used to discount agent nb 1
+        => action = argmax score0(a)*(score1(a)-score2(a)), where score0, score1, score2 is the 
+        score attributed to the action by each agent 0, 1 and 2
+        - discounts_with_action: indicate that the discount agents use actions
+        --> if True: action = argmax score0(a)*(score1(a)-score2(a)) => score2 depends on a
+        --> if False: action = argmax score0(a)*(score1(a)-score2) => score2 doesn't depend on a
+        - kronecker_features: whether to include interaction terms between user/products
+        - linear_reg : whether to use a linear regression (proportions of sales)
+        - look_ahead: whether to use constant user features by looking at the future for the training
+        - sample_weight: whether to user an inverse variance (of the user features) sample weight
+        - softmax: whether to sample from the policy (instead of taking the argmax)
+        - memory: used for features
+        - epsilon_greedy: whether to apply exploration, with parameter epsilon'''
     def __init__(self, feature_provider_list, reward_provider_list, discounts, discounts_with_action=True, 
                  kronecker_features = False, linear_reg = False, look_ahead = False, 
                  sample_weight = False, memory = False,
                  # softmax = False,
-                 # multiply_features = False, 
                  epsilon_greedy = False, epsilon = 0.3, seed=43):
         self.feature_provider_list = feature_provider_list
         self.reward_provider_list = reward_provider_list
@@ -1206,9 +1241,11 @@ class SaleProductLikelihoodAgent(Agent):
         name_models = self.info['Name'].strip('_all').split('Provider_')
         for i in range(len(self.models)):
             print('--- Evaluate model : ',name_models[i])
+            # Define feature and reward for each agent
             feature_provider = self.feature_provider_list[i]
             reward_provider = self.reward_provider_list[i]
             
+            # extract user states, actions, rewards, propensities and info
             if (self.look_ahead == False):
                 user_states, actions, rewards, proba_actions, info = build_train_data(logs, 
                                                                                 feature_provider, 
@@ -1288,11 +1325,6 @@ class SaleProductLikelihoodAgent(Agent):
             score = model.predict_proba(all_action_features)[:, 1]
         except:
             score = model.predict_proba(all_action_features)
-        # if self.multiply_features:
-        #     try:
-        #         score = score * np.array(user_state)
-        #     except Exception as e: 
-        #         print(e)
         return score
     
     
@@ -1375,16 +1407,11 @@ class SaleProductLikelihoodAgent(Agent):
                     discount_val = np.zeros(before_discount.shape)
                     
                 ## Combine the two models
-                # # Clip discounted score to avoid negatives
-                # after_discount = np.clip(before_discount - discount_val,a_min=0,a_max=1)
-                # Clip discounted score to avoid negatives
-                # print("before discount ",before_discount)
-                # print("discount_val ",discount_val)
                 after_discount = before_discount - discount_val
                 self.report_issue['discounts'].append(after_discount)
+                # if ALL discounted values are negative: apply a sigmoid 
+                # Note : this should not happen (at least some values should be positive)
                 if len(np.where(after_discount<0)[0]) == self.num_products:
-                    # print(after_discount)
-                    # print(np.where(after_discount<0)[0])
                     after_discount = sig(after_discount)
                 score = score*after_discount
             
@@ -1430,6 +1457,17 @@ class SaleProductLikelihoodAgent(Agent):
 ## Function to train all agents at once
 def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_features=False,
                  weights=False,  click=True, memory=False, repo = 'data/'):
+    '''Function to train the agent optimising for at least one sale (DPCS) + baseline agents 
+    --> Baselines include: Click agent, Post-click sale agent, Post-display sale agent
+    Inputs:
+        - name: name of the logging policy
+        - logs: logs of data
+        - feature_name: name of the features
+        - features: 
+        - num_users: number of users for the training
+        - kronecker-features: whether to add user-item interaction in the features
+        - weights: sample weights (inverse variance of user features estimation)
+        '''
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1444,11 +1482,6 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
     Noclick_rewards_provider = NoclickRewardProdivder()
     
     name_extension = 'pres'
-    
-    # name_extension = ''
-    # if kronecker_features==True:
-    #     print("Kronecker features")
-    #     name_extension += 'kron'
         
     if weights==True:
         print("Weights")
@@ -1494,8 +1527,7 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
                                                     memory=memory)
     likelihood_saleclickprod.train(data)
     info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
-    # if not click:
-    #     print(likelihood_saleclickprod.info["Name"])
+
     if memory:
         info[likelihood_saleclickprod.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
@@ -1511,15 +1543,11 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
                                                     memory=memory)
     likelihood_saleclickprod_discount.train(data)
     info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-    # if not click:
-    #     print(likelihood_saleclickprod_discount.info["Name"])
-    #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
-    
+
     # Evaluate the submodels
     print('----- Evaluate submodels')
     data_test = logs[name_logging+'_test']
     performance = likelihood_saleclickprod_discount.evaluate_models(data_test)
-    # print(likelihood_saleclickprod_discount.performance_models)
     
     if memory:
         info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_mem'
@@ -1533,6 +1561,16 @@ def train_agents(name_logging,logs,feature_name,features, num_users, kronecker_f
 
 def train_timeagents(name_logging,logs,feature_name,features, num_users, kronecker_features=False, linear_reg=False,
                      weights=False, click=True, memory = False, repo = 'data/'):
+    '''Function to train the agent optimising for the proportion of sales instead (DPCS)
+    + Post-click sale agent with proportions added as baseline
+    Inputs:
+        - name: name of the logging policy
+        - logs: logs of data
+        - feature_name: name of the features
+        - features: 
+        - num_users: number of users for the training
+        - kronecker-features: whether to add user-item interaction in the features
+        - weights: sample weights (inverse variance of user features estimation)'''
     info = {}
     save_agents = {}
     data = logs[name_logging]
@@ -1547,14 +1585,6 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
     Noclick_rewards_provider_time = NoclickRewardProdivder(normalize = True)
     
     name_extension = 'prop'
-    # name_extension = 'time'
-    
-    # if kronecker_features==True:
-    #     print("Kronecker features")
-    #     name_extension += 'kron'
-    # if linear_reg ==True:
-    #     print("Linear reg")
-    #     name_extension += 'lin'
     
     if weights==True:
         print("Weights")
@@ -1577,9 +1607,7 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
                                                     memory=memory)
     likelihood_saleclickprod.train(data)
     info[likelihood_saleclickprod.info["Name"]] = likelihood_saleclickprod.info
-    # if not click:
-    #     print(likelihood_saleclickprod.info["Name"])
-    #     # info[likelihood_saleclickprod.info["Name"]]["Name"] += '_all'
+    
     if memory:
         info[likelihood_saleclickprod.info["Name"]]["Name"] += '_mem'
     save_agents["likelihood_saleclickprod"+name_extension] = likelihood_saleclickprod
@@ -1595,9 +1623,6 @@ def train_timeagents(name_logging,logs,feature_name,features, num_users, kroneck
                                                     memory=memory)
     likelihood_saleclickprod_discount.train(data)
     info[likelihood_saleclickprod_discount.info["Name"]] = likelihood_saleclickprod_discount.info
-    # if not click:
-    #     print(likelihood_saleclickprod_discount.info["Name"])
-    #     # info[likelihood_saleclickprod_discount.info["Name"]]["Name"] += '_all'
     
     
     # Evaluate the submodels

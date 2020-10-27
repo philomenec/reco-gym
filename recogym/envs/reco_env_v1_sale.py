@@ -52,14 +52,16 @@ env_1_sale_args = {
         'kappa': 0.2, # post-click scaling of theuser embedding update 
         # 'kappa':0.3,
         'sigma_Lambda' : 1,
-        # 'user_propensity' : {'a':2, 'b':6}, # propensity of buying of users, drawn from a beta distribution
-        'psale_scale' : 0.15, # scaling coefficient for the probability of drawing a sale
-        # 'psale_scale' : 0.1, # scaling coefficient for the probability of drawing a sale
+        # scaling coefficient for the probability of drawing a sale:
+        'psale_scale' : 0.15, 
+        # whether to use the user conversion embedding delta to draw click (otherwise the organic embedding omega is used)
         'delta_for_clicks' : 0,
-        'delta_for_views' : 0,
         'sig_coef':1,
+        # whether to add a popularity coefficient for sales
         'mu_sale':True,
+        # variance of the popularity coefficient for sale
         'sigma_mu_sale':0,
+        # probability of bouncing (click but stay in the bandit state)
         'p_bounce':0
     }
 }
@@ -82,26 +84,32 @@ def ff(xx, aa=5, bb=2, cc=0.3, dd=2, ee=6):
 
 
 # Environment definition.
-class RecoEnv1Sale(AbstractEnv): ##H
+class RecoEnv1Sale(AbstractEnv): 
 
     def __init__(self):
-        super(RecoEnv1Sale, self).__init__() ##H
+        super(RecoEnv1Sale, self).__init__() 
         self.cached_state_seed = None
-        self.proba_sales={} ##H
+        # Keep track of the probability of sale
+        self.proba_sales={} 
+        # Keep track of the CTR
         self.ctr={}
+        # Keep track of the current CTR, probability of sale and organic probability of sale
         self.current_ctr = None
         self.current_proba_sales = None
         self.organic_proba_sales = None
-        self.user_ps_list=[] ##H
+        # List of user propensities
+        self.user_ps_list=[] 
+        # List of user embeddings
         self.user_embedding_list = []
+        # List of recommendations
         self.action_list = []
-        self.list_dot_products = [] #toremove
 
     def generate_organic_sessions(self, initial_product = None):
         
         # Initialize session.
         session = OrganicSessions()
-        sales = 0 ##H
+        # Initialise the total number of sales
+        sales = 0
         
         if initial_product is not None :
             self.product_view = initial_product
@@ -115,9 +123,9 @@ class RecoEnv1Sale(AbstractEnv): ##H
             # Draw a sale and update total number of sales
             sale = self.draw_sale(self.product_view, 
                                   coef=self.config.sig_coef if not None else 1)
-            sales += sale ##H
+            sales += sale 
             
-            ##H
+            ## if there is a sale: stay in the organic session but update time
             if sale : 
                 # self.state is not updated to stay in the organic state 
                 # it is only updated in the sessions object
@@ -142,9 +150,8 @@ class RecoEnv1Sale(AbstractEnv): ##H
             
             # Draw a sale and update total number of sales
             sale = self.draw_sale(self.product_view) ##H
-            sales += sale ##H
+            sales += sale 
             
-            ##H
             if sale : 
                 # self.state is not updated to stay in the organic state 
                 # it is only updated in the sessions object
@@ -196,7 +203,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
             self.first_step = False
             sessions, sales = self.generate_organic_sessions() ##H
             self.user_embedding_list.append({"init":self.omega})
-            self.list_dot_products.append([]) #toremove
             return (
                 Observation(
                     DefaultContext(
@@ -204,9 +210,9 @@ class RecoEnv1Sale(AbstractEnv): ##H
                         self.current_user_id
                     ),
                     sessions,
-                    click = [] #modif
+                    click = [] # add clicks as observations (not in the reward)
                 ),
-                0,  ##H or set back to none ?## or sales ? 
+                0,  # reward of 0 at the first step
                 self.state == stop,
                 {}
             )
@@ -220,12 +226,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.update_state()
 
         if click == 1:
+            # Bounce with a certain probability (stay in the bandit state)
             if self.config.p_bounce < self.rng.rand():
-                self.state = organic  # After a click, Organic Events always follow.
-                self.update_user_feature(action_id) ##H # Update user feature based on reco
+                 # After a click, Organic Events always follows:
+                self.state = organic 
+                # Update user feature based on the clicked reco !
+                self.update_user_feature(action_id) 
                 initial_product = action_id
             else:
-                # print('bounce')
                 self.state = bandit
             
         else :
@@ -248,7 +256,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
             Observation(
                 DefaultContext(self.current_time, self.current_user_id),
                 sessions,
-                self.clicks #modif
+                self.clicks # add click observation
             ),
             reward, 
             self.state == stop,
@@ -283,13 +291,13 @@ class RecoEnv1Sale(AbstractEnv): ##H
         if done:
             self.user_embedding_list[len(self.user_embedding_list)-1]["end"] = self.delta
             self.clicks = self.clicks + [{'t':self.current_time, 'u':self.current_user_id,
-                                          'a': action, 'c':0}] #modif
+                                          'a': action, 'c':0}] 
             return (
                 action,
                 Observation(
                     DefaultContext(self.current_time, self.current_user_id),
                     self.empty_sessions,
-                    self.clicks #modif
+                    self.clicks # add reward observation
                 ),
                 0, 
                 done, 
@@ -333,14 +341,14 @@ class RecoEnv1Sale(AbstractEnv): ##H
             assert (observation is not None)
             assert (observation.sessions() is not None)
             for session in observation.sessions():
+                ##keep track of everything:
                 data['t'].append(session['t'])
                 data['u'].append(session['u'])
-                ##H before: just appending organic ##++ keep organic ?
                 data['z'].append('organic' if session['z']=='pageview' else 'sale') 
                 data['v'].append(session['v'])
                 data['a'].append(None)
                 data['c'].append(None)
-                data['r'].append(None) ##H
+                data['r'].append(None) # also keep track of the reward
                 data['ps'].append(None)
                 data['ps-a'].append(None)
 
@@ -353,7 +361,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
                 data['z'].append('bandit')
                 data['v'].append(None)
                 data['a'].append(action['a'])
-                data['c'].append(click) ##H
+                data['c'].append(click) #keep track of the click (not in the reward)
                 data['r'].append(reward)
                 data['ps'].append(action['ps'])
                 data['ps-a'].append(action['ps-a'] if 'ps-a' in action else ())
@@ -439,7 +447,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
             for session in observation.sessions():
                 data['t'].append(session['t'])
                 data['u'].append(session['u'])
-                ##H before: just appending organic ##++ keep organic ?
                 data['z'].append('organic' if session['z']=='pageview' else 'sale') 
                 data['v'].append(session['v'])
                 data['a'].append(None)
@@ -464,14 +471,12 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         unique_user_id = 0
         for _ in trange(num_organic_offline_users, desc='Organic Users'):
-        # for _ in range(num_organic_offline_users, desc='Organic Users'):
             self.reset(unique_user_id)
             unique_user_id += 1
             observation, _, _, _ = self.step(None)
             _store_organic(observation)
 
         for _ in trange(num_offline_users, desc='Users'):
-        # for _ in range(num_offline_users, desc='Users'):
             self.reset(unique_user_id)
             unique_user_id += 1
             observation, reward, done, info = self.step(None)
@@ -527,7 +532,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.Gamma = self.rng.normal(
             size=(self.config.num_products, self.config.K)
         )
-        # self.Gamma = np.abs(self.Gamma) ##H
 
         # Initialise mu_organic.
         self.mu_organic = self.rng.normal(
@@ -537,9 +541,7 @@ class RecoEnv1Sale(AbstractEnv): ##H
 
         # Initialise beta, mu_bandit for all products (Bandit).
         self.generate_beta(self.config.number_of_flips)
-        # self.beta = np.abs(self.beta) ##H
 
-        ##H
         # Initialise sale embedding
         self.Lambda = self.rng.normal(
             scale = self.config.sigma_Lambda,
@@ -550,20 +552,17 @@ class RecoEnv1Sale(AbstractEnv): ##H
         # Add product popularity with mean of the organic popularity
         if self.config.mu_sale == True:
             shift_mu_sale_organic = 2*np.abs(np.median(self.mu_organic))
-            # print(shift_mu_sale_organic)
             self.mu_sale = self.rng.normal(
                 self.mu_organic[:,0]-shift_mu_sale_organic, self.config.sigma_mu_sale,
                 size=self.config.num_products
             )
         else:
             self.mu_sale = np.zeros(self.config.num_products)
-    
-        # print("mu sale",self.mu_sale)
+
 
     # Create a new user.
     def reset(self, user_id=0):
         super().reset(user_id)
-        ##++
         self.omega = self.rng.normal(
             0, self.config.sigma_omega_initial, size=(self.config.K, 1)
         )
@@ -572,7 +571,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
         self.ctr[self.current_user_id] = [] 
         self.current_ctr = None
         self.current_user_ps = self.config.psale_scale
-        # self.organic_proba_sales = None
         self.current_proba_sales = None
         self.last_proba_sales = self.organic_proba_sales
         self.user_ps_list.append(self.current_user_ps)
@@ -590,7 +588,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
         omega_k = 1 if time_delta == 0 else time_delta
 
         # And update omega.
-        ##++
         if self.config.change_omega_for_bandits or self.state == organic:
             self.omega = self.rng.normal(
                 self.omega,
@@ -690,15 +687,9 @@ class RecoEnv1Sale(AbstractEnv): ##H
         if self.config.normalize_beta:
             self.normalize_beta()
          
-    ##H
     def draw_sale(self, a, coef=1):
         ''' Draw sale following a Bernoulli'''
         # compute the sigmoid over the embeddings dot product
-        
-        try:
-            self.list_dot_products[len(self.list_dot_products)-1].append(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a])
-        except:
-            self.list_dot_products.append([self.Lambda[int(a),:] @ self.delta]+ self.mu_sale[a])
         p_sale = flatsig(self.Lambda[int(a),:] @ self.delta + self.mu_sale[a], coef=coef)[0]
         
         # add the user propensity to buy (personnalized or generic)
@@ -711,10 +702,6 @@ class RecoEnv1Sale(AbstractEnv): ##H
         )
         return sale      
        
-    ##H
     def update_user_feature(self,a):
-        # #NB : scale new omega by the initial norm
-        # omega_norm = np.linalg.norm(self.omega,ord=2)
-        # add_term = np.expand_dims(self.config.kappa*self.Lambda[int(a),:], axis=1)
-        # self.omega = (self.omega + add_term)/omega_norm
+        '''Update user features given action a (after a click)'''
         self.delta = (1-self.config.kappa)*self.delta + self.config.kappa*np.expand_dims(self.Lambda[int(a),:], axis=1)
