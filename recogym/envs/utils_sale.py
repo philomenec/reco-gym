@@ -56,7 +56,7 @@ def count_sales_first_session(data):
     return sales_first_session, no_event
 
 def check_sales(agent, env, num_products=10):
-
+    '''Function +++'''
     env.reset_random_seed()
 
     # Train on 1000 users offline.

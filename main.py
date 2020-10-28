@@ -25,20 +25,20 @@ num_AB_tests = 25
 # Number of users to evaluate models performance
 num_users_test = 1000
 
-# tests
+# ##tests
 # # Number of cores
 # num_cores = 4
 # # Number of users for the training
-# num_users = 30
+# num_users = 100
 # # Number of users for the A/B test
 # num_users_AB = 7
 # # Number of A/B tests
 # num_AB_tests = 2
 # # Number of users to evaluate models performance
-# num_users_test = 3
+# num_users_test = 100
 
 #### Configuration !!
-config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [1,0.5,0.8]}
+config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.8,0.5,1]}
 names_runs = list(config_dict.keys())
 
 
@@ -88,16 +88,11 @@ for i in range(len(config_dict)):
         name_agent += name_run
 
     #### Logs
-    try:
-        print("--- Load logs ---")
-        logs = {name_agent:pd.read_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv')}
-        logs[str(name_agent+'_test')] = pd.read_csv(data_repo + 'data' + str(num_users) + name_agent +'_test' + '.csv')
-    except:
-        print("--- Generate logs ---")
-        logs = {name_agent:deepcopy(env).generate_logs(num_users)}
-        logs[str(name_agent+'_test')] = deepcopy(env).generate_logs(num_users_test)
-        logs[name_agent].to_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv',index = False)
-        logs[str(name_agent+'_test')].to_csv(data_repo + 'data' + str(num_users) + name_agent+'_test'+ '.csv',index = False)
+    print("--- Generate logs ---")
+    logs = {name_agent:deepcopy(env).generate_logs(num_users)}
+    logs[str(name_agent+'_test')] = deepcopy(env).generate_logs(num_users_test)
+    logs[name_agent].to_csv(data_repo + 'data' + str(num_users) + name_agent + '.csv',index = False)
+    logs[str(name_agent+'_test')].to_csv(data_repo + 'data' + str(num_users) + name_agent+'_test'+ '.csv',index = False)
     
     
     config = config_dict[name_run]

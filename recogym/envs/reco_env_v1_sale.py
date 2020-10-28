@@ -354,7 +354,7 @@ class RecoEnv1Sale(AbstractEnv):
 
         def _store_bandit(action, reward, observation):
             if action:
-                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
+                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 
                 assert (reward is not None)
                 data['t'].append(action['t'])
                 data['u'].append(action['u'])
@@ -457,7 +457,7 @@ class RecoEnv1Sale(AbstractEnv):
 
         def _store_bandit(action, reward, observation):
             if action:
-                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 #modif
+                click = observation.click[len(observation.click)-1]['c'] if (observation.click is not None) & (len(observation.click)>0) else 0 
                 assert (reward is not None)
                 data['t'].append(action['t'])
                 data['u'].append(action['u'])
@@ -542,7 +542,7 @@ class RecoEnv1Sale(AbstractEnv):
         # Initialise beta, mu_bandit for all products (Bandit).
         self.generate_beta(self.config.number_of_flips)
 
-        # Initialise sale embedding
+        # Initialise the product sale embedding lambda
         self.Lambda = self.rng.normal(
             scale = self.config.sigma_Lambda,
             size=(self.config.num_products, self.config.K)
@@ -703,5 +703,6 @@ class RecoEnv1Sale(AbstractEnv):
         return sale      
        
     def update_user_feature(self,a):
-        '''Update user features given action a (after a click)'''
+        '''Update user features given action a (after a click) as a linear combination between the 
+        old user features delta, and the product embedding with respect to product a, Lambda_a'''
         self.delta = (1-self.config.kappa)*self.delta + self.config.kappa*np.expand_dims(self.Lambda[int(a),:], axis=1)

@@ -957,7 +957,7 @@ class SaleLikelihoodAgent(Agent):
         
         
     def evaluate_model(self, logs):
-        '''Evaluate the submodel with classification metrics''''
+        '''Evaluate the submodel with classification metrics'''
         # Get features, actions, rewards, and propensities
         if self.look_ahead == False:
             user_states, actions, rewards, proba_actions, self.info = build_train_data(logs, 
@@ -1016,7 +1016,7 @@ class SaleLikelihoodAgent(Agent):
         return score
     
     def observation_to_log(self,observation):
-        '''Transform simulator observation into a log''''
+        '''Transform simulator observation into a log'''
         data = self.logged_observation
         
         def _store_organic(observation):
