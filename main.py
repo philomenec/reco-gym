@@ -38,7 +38,7 @@ num_users_test = 1000
 # num_users_test = 100
 
 #### Configuration !!
-config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.8,0.5,1]}
+config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.9,0.95,1]}
 names_runs = list(config_dict.keys())
 
 
