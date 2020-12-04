@@ -21,7 +21,7 @@ num_users = 5000
 # Number of users for the A/B test
 num_users_AB = 5000
 # Number of A/B tests
-num_AB_tests = 25
+num_AB_tests = 40
 # Number of users to evaluate models performance
 num_users_test = 1000
 
@@ -38,7 +38,7 @@ num_users_test = 1000
 # num_users_test = 100
 
 #### Configuration !!
-config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.9,0.95,1]}
+config_dict = {'k0.6_pbounce'+str(round(p,1)):{'pbounce':round(p,1)} for p in [0.85,0.9,0.95]}
 names_runs = list(config_dict.keys())
 
 
